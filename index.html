@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>풋볼캐슬 — 프로토타입 v2</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F4F6F1; --ink:#0F2E1D; --grass:#1E7A46; --grass-soft:#E3EFE6;
+    --ball:#F2691D; --ball-soft:#FDEBDD; --crown:#D9A02B; --crown-soft:#F8EFD8;
+    --mist:#DCE3DA; --danger:#C2452D; --radius:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    font-family:'Noto Sans KR',-apple-system,sans-serif;background:var(--paper);color:var(--ink);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 8px 40px;
+    background-image:radial-gradient(circle at 50% -8%, rgba(30,122,70,.10), transparent 46%),
+      repeating-linear-gradient(90deg, transparent 0 119px, rgba(15,46,29,.045) 119px 120px);
+  }
+  .proto-head{max-width:420px;width:100%;text-align:center;margin-bottom:14px}
+  .proto-head h1{font-family:'Black Han Sans',sans-serif;font-size:27px;letter-spacing:.5px}
+  .proto-head h1 .castle{color:var(--crown)}
+  .proto-head p{font-size:12.5px;color:#5C6E61;margin-top:4px;line-height:1.5}
+
+  .phone{
+    width:100%;max-width:400px;background:#fff;border:1.5px solid var(--ink);border-radius:30px;
+    box-shadow:10px 10px 0 rgba(15,46,29,.12);overflow:hidden;display:flex;flex-direction:column;
+    height:min(800px, calc(100vh - 130px));min-height:640px;
+  }
+  .statusbar{display:flex;justify-content:space-between;padding:10px 20px 6px;font-size:11px;font-weight:700;color:#7d8b80}
+  .screens{flex:1;overflow-y:auto;position:relative}
+  .screen{display:none;padding:6px 16px 24px;animation:fade .25s ease}
+  .screen.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  .eyebrow{font-size:10.5px;font-weight:700;letter-spacing:1.5px;color:var(--grass);text-transform:uppercase}
+  .h-title{font-family:'Black Han Sans',sans-serif;font-size:22px;line-height:1.25;margin:2px 0 4px}
+  .card{background:#fff;border:1.5px solid var(--ink);border-radius:var(--radius);padding:14px 15px;margin-top:12px}
+  .card.tint-g{background:var(--grass-soft)} .card.tint-o{background:var(--ball-soft)} .card.tint-c{background:var(--crown-soft)}
+  .card h3{font-size:13.5px;font-weight:900;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .sub{font-size:11.5px;color:#5C6E61;line-height:1.55;margin-top:3px}
+  .num{font-family:'Black Han Sans',sans-serif}
+  .pill{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid var(--ink)}
+  .pill.gold{background:var(--crown);color:#fff;border-color:var(--crown)}
+  .pill.green{background:var(--grass);color:#fff;border-color:var(--grass)}
+  .pill.orange{background:var(--ball);color:#fff;border-color:var(--ball)}
+  .pill.line{background:#fff}
+  .btn{display:block;width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--ink);background:var(--ball);color:#fff;
+    font-family:'Noto Sans KR';font-weight:900;font-size:15px;cursor:pointer;box-shadow:3px 3px 0 var(--ink);transition:transform .08s, box-shadow .08s}
+  .btn:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+  .btn.ghost{background:#fff;color:var(--ink)} .btn[disabled]{opacity:.45;cursor:not-allowed}
+  .bar{height:9px;background:#EDF1EC;border:1px solid var(--mist);border-radius:99px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:var(--grass);border-radius:99px;transition:width .5s ease}
+  .bar.orange > i{background:var(--ball)}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .divider{border:none;border-top:1px dashed var(--mist);margin:11px 0}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  th{font-size:10px;color:#7d8b80;font-weight:700;text-align:left;padding:4px 2px;border-bottom:1px solid var(--mist)}
+  td{padding:6px 2px;border-bottom:1px solid #F0F3EF}
+  td.rank{font-family:'Black Han Sans',sans-serif;width:26px;color:var(--grass)}
+  tr.me td{background:var(--ball-soft);font-weight:700}
+
+  /* 홈 */
+  .today-rings{display:flex;gap:10px;margin-top:10px}
+  .ring{flex:1;text-align:center;padding:12px 4px;border:1.5px solid var(--ink);border-radius:12px;background:#fff}
+  .ring .num{font-size:24px} .ring.used{background:#F0F3EF;color:#9aa79e;border-color:var(--mist)}
+  .ring .lab{font-size:10px;font-weight:700;margin-top:2px}
+  .badge-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .wbadge{font-size:11px;font-weight:700;background:var(--crown-soft);border:1px solid var(--crown);color:#8a6410;border-radius:10px;padding:5px 9px}
+
+  /* 도전 */
+  .cam{position:relative;margin-top:12px;border-radius:16px;border:1.5px solid var(--ink);
+    background:linear-gradient(180deg,#12241B 0%, #0C1A13 100%);height:250px;overflow:hidden;color:#DCE7DE}
+  .cam .kneeline{position:absolute;left:8%;right:8%;top:62%;border-top:2px dashed rgba(242,105,29,.85)}
+  .cam .kneeline span{position:absolute;right:0;top:-18px;font-size:9.5px;color:var(--ball);font-weight:700}
+  .cam .silhouette{position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:84px;height:140px;border-radius:40px 40px 0 0;background:rgba(233,239,230,.10);border:1px dashed rgba(233,239,230,.25)}
+  .cam .ballDot{position:absolute;left:calc(50% + 34px);width:22px;height:22px;border-radius:50%;background:var(--ball);border:2px solid #fff;top:70%;box-shadow:0 0 14px rgba(242,105,29,.7)}
+  .cam.counting .ballDot{animation:juggle .5s ease-in-out infinite alternate}
+  @keyframes juggle{from{top:70%}to{top:32%}}
+  .cam .bigcount{position:absolute;top:12px;left:16px;font-family:'Black Han Sans';font-size:54px;color:#fff;line-height:1}
+  .cam .camtag{position:absolute;top:16px;right:14px;font-size:10px;letter-spacing:1px;color:#9FB3A5;font-weight:700}
+  .cam .rec{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);margin-right:4px;animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.2}}
+  .valid-note{display:flex;gap:8px;margin-top:10px}
+  .valid-note .chip{flex:1;font-size:10.5px;line-height:1.45;background:#fff;border:1px solid var(--mist);border-radius:10px;padding:8px}
+  .chip b{color:var(--grass)}
+  .result-card{display:none;margin-top:12px;border:1.5px solid var(--grass);border-radius:var(--radius);background:var(--grass-soft);padding:14px;animation:fade .3s}
+  .result-card.show{display:block}
+  .result-card .big{font-family:'Black Han Sans';font-size:26px;color:var(--grass)}
+
+  /* 지도 */
+  .mapbox{position:relative;margin-top:12px;height:330px;border:1.5px solid var(--ink);border-radius:16px;overflow:hidden;
+    background:
+      linear-gradient(115deg, transparent 0 58%, rgba(120,170,215,.35) 58% 66%, transparent 66%),
+      repeating-linear-gradient(0deg, rgba(15,46,29,.05) 0 1px, transparent 1px 46px),
+      repeating-linear-gradient(90deg, rgba(15,46,29,.05) 0 1px, transparent 1px 46px),
+      radial-gradient(circle at 22% 30%, rgba(30,122,70,.14) 0 52px, transparent 53px),
+      radial-gradient(circle at 78% 72%, rgba(30,122,70,.12) 0 44px, transparent 45px),
+      #EDF2EA;
+  }
+  .maptag{position:absolute;top:10px;left:10px;font-size:9.5px;font-weight:700;color:#7d8b80;background:rgba(255,255,255,.85);border:1px solid var(--mist);border-radius:8px;padding:3px 8px;z-index:2}
+  .castle{position:absolute;transform:translate(-50%,-90%);text-align:center;cursor:pointer;z-index:3;background:none;border:none;font-family:'Noto Sans KR'}
+  .castle .flag{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;background:#fff;border:2px solid var(--ink);box-shadow:2px 2px 0 rgba(15,46,29,.25);margin:0 auto}
+  .castle.mine .flag{border-color:var(--ball);box-shadow:0 0 0 3px var(--ball-soft), 2px 2px 0 rgba(15,46,29,.25)}
+  .castle.rival .flag{border-color:var(--grass)}
+  .castle.ruin .flag{border-color:var(--mist);filter:grayscale(1);opacity:.75}
+  .castle .cname{font-size:9px;font-weight:900;background:rgba(255,255,255,.92);border-radius:6px;padding:1px 5px;margin-top:3px;display:inline-block;border:1px solid var(--mist);white-space:nowrap}
+  .mypos{position:absolute;width:14px;height:14px;border-radius:50%;background:#3B82F6;border:3px solid #fff;box-shadow:0 0 0 5px rgba(59,130,246,.22);z-index:2}
+  .regbtn{position:absolute;right:10px;bottom:10px;z-index:4;font-family:'Noto Sans KR';font-size:11px;font-weight:900;background:var(--ink);color:#fff;border:none;border-radius:99px;padding:9px 13px;cursor:pointer;box-shadow:2px 2px 0 rgba(15,46,29,.3)}
+  .venuecard{display:none;margin-top:10px;animation:fade .25s}
+  .venuecard.show{display:block}
+  .regform{display:none;margin-top:10px;animation:fade .25s}
+  .regform.show{display:block}
+  .regform input,.regform select{width:100%;padding:10px;border:1.5px solid var(--ink);border-radius:10px;font-family:'Noto Sans KR';font-size:13px;margin-top:8px;background:#fff}
+  .legend{display:flex;gap:10px;margin-top:8px;font-size:10px;font-weight:700;color:#5C6E61;flex-wrap:wrap}
+  .legend span::before{content:"●";margin-right:3px}
+  .legend .l1::before{color:var(--ball)} .legend .l2::before{color:var(--grass)} .legend .l3::before{color:#b9c2ba}
+
+  /* 팀 */
+  .member{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid #F0F3EF;font-size:12.5px}
+  .member .avatar{width:28px;height:28px;border-radius:50%;background:var(--grass-soft);border:1px solid var(--mist);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px;color:var(--grass)}
+  .member .st{margin-left:auto;font-size:10.5px;font-weight:700}
+  .member .ok{color:var(--grass)} .member .no{color:#9aa79e}
+  .poke{font-size:10px;font-weight:700;border:1px solid var(--ball);color:var(--ball);background:#fff;border-radius:99px;padding:3px 8px;cursor:pointer;font-family:'Noto Sans KR'}
+  .poke:disabled{opacity:.4}
+  .slotwrap{display:flex;gap:6px;margin-top:10px}
+  .slot{flex:1;aspect-ratio:1;border:1.5px dashed var(--mist);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:9.5px;font-weight:700;color:#9aa79e;background:#fff;text-align:center}
+  .slot.claimed{border:1.5px solid var(--grass);background:var(--grass-soft);color:var(--ink)}
+  .slot .ballico{font-size:15px}
+  .vs{display:flex;align-items:center;gap:8px;font-weight:900;margin-top:8px}
+  .vs .score{font-family:'Black Han Sans';font-size:26px}
+  .confirm-tag{font-size:10px;font-weight:700;color:var(--grass)}
+  .rec-tabs{display:flex;gap:6px;margin-top:8px}
+  .rec-tabs button{flex:1;padding:7px;font-size:11px;font-weight:700;border:1.5px solid var(--ink);background:#fff;border-radius:9px;cursor:pointer;font-family:'Noto Sans KR'}
+  .rec-tabs button.on{background:var(--ink);color:#fff}
+
+  /* 구장 */
+  .nameplate{margin-top:12px;border:2px solid var(--crown);border-radius:16px;background:linear-gradient(180deg,#FDF7E8,#F8EFD8);
+    padding:16px 15px;position:relative;box-shadow:4px 4px 0 rgba(217,160,43,.35)}
+  .nameplate::before{content:"";position:absolute;inset:5px;border:1px dashed rgba(217,160,43,.55);border-radius:11px;pointer-events:none}
+  .nameplate .lord{font-family:'Black Han Sans';font-size:24px;margin-top:2px}
+  .nameplate .venue{font-size:11px;font-weight:700;color:#8a6410;letter-spacing:1px}
+  .seg{display:flex;gap:6px;margin-top:14px}
+  .seg button{flex:1;padding:8px 2px;font-size:11.5px;font-weight:700;border:1.5px solid var(--ink);background:#fff;border-radius:10px;cursor:pointer;font-family:'Noto Sans KR'}
+  .seg button.on{background:var(--ink);color:#fff}
+  .board{display:none} .board.on{display:block;animation:fade .25s}
+  .goalgrad{margin-top:10px;background:#fff;border:1.5px dashed var(--ball);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700}
+  .goalgrad .num{color:var(--ball);font-size:18px}
+
+  /* 탭바 */
+  .tabbar{display:flex;border-top:1.5px solid var(--ink);background:#fff}
+  .tabbar button{flex:1;padding:9px 2px 11px;border:none;background:none;cursor:pointer;font-family:'Noto Sans KR';
+    font-size:10px;font-weight:700;color:#8b978e;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tabbar button .ico{font-size:17px;line-height:1}
+  .tabbar button.on{color:var(--ink)}
+  .tabbar button.on::after{content:"";width:16px;height:3px;border-radius:3px;background:var(--ball);margin-top:1px}
+
+  .footnote{max-width:400px;width:100%;font-size:11px;color:#7d8b80;margin-top:14px;line-height:1.6;text-align:center}
+  @media (prefers-reduced-motion: reduce){ *{animation:none!important;transition:none!important} }
+</style>
+</head>
+<body>
+
+<div class="proto-head">
+  <h1>풋볼캐슬 <span class="castle">🏰</span> <span style="font-size:14px;color:#7d8b80">프로토타입 v2</span></h1>
+  <p>v2 반영: 도전 1일 2회 · 신규 30일 특례(2개 유효) · 풋살 7인/축구 11인 해금 ·<br>종목별 전적 분리 · <b>지도 탭</b>(성 마커 + 구장 등록 요청)</p>
+</div>
+
+<div class="phone">
+  <div class="statusbar"><span>21:41</span><span>인천 · GPS 인증됨 📍</span></div>
+
+  <div class="screens">
+
+    <!-- ═══ 홈 ═══ -->
+    <section class="screen on" id="scr-home">
+      <div class="eyebrow">HOME</div>
+      <div class="h-title">에이스 님,<br>오늘 도전 <span style="color:var(--ball)">1회</span> 남았어요</div>
+      <div class="sub">유효 도전 = 연속 10개 이상 <b>또는</b> 개인 최고(31개) 경신 · 하루 2회</div>
+
+      <div class="today-rings">
+        <div class="ring used"><div class="num">✓</div><div class="lab">1회차 · 유효 (17개)</div></div>
+        <div class="ring"><div class="num" style="color:var(--ball)">2</div><div class="lab">도전 가능</div></div>
+      </div>
+
+      <div class="card tint-c">
+        <div class="row">
+          <h3>👑 7월 성주 레이스</h3>
+          <span class="pill gold">3위</span>
+        </div>
+        <div class="sub">신촌근린공원 풋살장 · 월 점수 = 상위 3주 합산</div>
+        <div style="margin-top:9px" class="bar"><i style="width:64%"></i></div>
+        <div class="row" style="margin-top:6px;font-size:11px;font-weight:700">
+          <span>내 점수 <span class="num" style="font-size:15px">16</span></span>
+          <span style="color:#8a6410">1위와 5회 차이 · 22일 남음</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>📈 내 기록</h3>
+        <div class="row" style="margin-top:8px">
+          <div><div class="sub">개인 최고</div><div class="num" style="font-size:26px">31<span style="font-size:13px">개</span></div></div>
+          <div><div class="sub">이번 주 유효 도전</div><div class="num" style="font-size:26px">5<span style="font-size:13px">회</span></div></div>
+          <div><div class="sub">연속 출석</div><div class="num" style="font-size:26px">4<span style="font-size:13px">일</span></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>🏅 주간 배지</h3>
+        <div class="badge-row">
+          <span class="wbadge">7월 1주 · 구장 1위</span>
+          <span class="wbadge">첫 20개 돌파</span>
+          <span class="wbadge" style="opacity:.4">7월 2주 · ?</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 도전 ═══ -->
+    <section class="screen" id="scr-challenge">
+      <div class="eyebrow">CHALLENGE · 풋살 구장</div>
+      <div class="h-title">리프팅 도전</div>
+      <div class="sub">폰을 바닥에 거치하고 2~3걸음 물러서세요. AI가 실시간으로 개수를 셉니다.</div>
+
+      <div class="cam" id="cam">
+        <div class="bigcount" id="count">0</div>
+        <div class="camtag"><span class="rec"></span>AI 판정 중</div>
+        <div class="kneeline"><span>무릎 기준선</span></div>
+        <div class="silhouette"></div>
+        <div class="ballDot"></div>
+      </div>
+
+      <div class="valid-note">
+        <div class="chip">✅ <b>유효 기준</b><br>10개 이상 또는 최고기록(31개) 경신</div>
+        <div class="chip">🐣 <b>신규 성민 특례</b><br>가입 30일 이내엔 <b>2개부터 유효</b></div>
+        <div class="chip">🔁 <b>연습 모드</b><br>기록 미반영 · 무제한</div>
+      </div>
+
+      <div style="margin-top:12px">
+        <button class="btn" id="startBtn" onclick="startChallenge()">도전 시작 (오늘 1회 남음)</button>
+        <button class="btn ghost" style="margin-top:8px" onclick="alert('연습 모드: 카운트만 하고 기록에는 반영하지 않습니다. 무제한으로 훈련하세요!')">연습 모드로 열기</button>
+      </div>
+
+      <div class="result-card" id="resultCard">
+        <div class="row">
+          <div>
+            <div class="eyebrow" style="color:var(--grass)">VALID ATTEMPT</div>
+            <div class="big" id="resultNum">14개 · 유효!</div>
+          </div>
+          <span class="pill green">클립 저장됨 🎬</span>
+        </div>
+        <div class="sub" id="resultSub"></div>
+      </div>
+    </section>
+
+    <!-- ═══ 지도 ═══ -->
+    <section class="screen" id="scr-map">
+      <div class="eyebrow">KINGDOM MAP</div>
+      <div class="h-title">우리 동네 캐슬 지도</div>
+      <div class="sub">실서비스는 카카오맵 SDK 위에 성 마커를 렌더링합니다. 성을 눌러보세요.</div>
+
+      <div class="mapbox">
+        <div class="maptag">지도 목업 · 실서비스: 카카오맵</div>
+        <div class="mypos" style="left:46%;top:58%"></div>
+
+        <button class="castle mine" style="left:36%;top:38%" onclick="showVenue(0)">
+          <span class="flag">🏰</span><span class="cname">신촌근린 <b style="color:var(--ball)">풋살</b></span>
+        </button>
+        <button class="castle rival" style="left:70%;top:26%" onclick="showVenue(1)">
+          <span class="flag">🏰</span><span class="cname">간석체육 <b style="color:var(--grass)">축구</b></span>
+        </button>
+        <button class="castle rival" style="left:60%;top:70%" onclick="showVenue(2)">
+          <span class="flag">🏰</span><span class="cname">구월풋살파크 <b style="color:var(--ball)">풋살</b></span>
+        </button>
+        <button class="castle ruin" style="left:20%;top:72%" onclick="showVenue(3)">
+          <span class="flag">🏚️</span><span class="cname">미개장 성터</span>
+        </button>
+
+        <button class="regbtn" onclick="toggleReg()">➕ 구장 등록 요청</button>
+      </div>
+
+      <div class="legend">
+        <span class="l1">내 홈구장</span><span class="l2">타 점령 구장</span><span class="l3">미개장(등록 대기)</span>
+      </div>
+
+      <div class="venuecard card" id="venuecard">
+        <div class="row">
+          <h3 id="vc-name">🏰 신촌근린공원 풋살장</h3>
+          <span class="pill orange" id="vc-sport">풋살</span>
+        </div>
+        <div class="sub" id="vc-sub">👑 성주: 볼차는곰 · 🚩 점령팀: FC 목요일 · 📍 240m</div>
+        <button class="btn ghost" style="margin-top:10px;padding:9px;font-size:13px" onclick="goVenueTab()">구장 상세 보기 →</button>
+      </div>
+
+      <div class="regform card tint-o" id="regform">
+        <h3>➕ 구장 등록 요청</h3>
+        <div class="sub">지도에 없는 구장을 알려주세요. 검토 승인 후, 그 위치에서 <b>첫 GPS 인증 도전이 성립하는 순간 성이 개장</b>됩니다. 등록자에겐 개척자 배지 🚩</div>
+        <input type="text" placeholder="구장 이름 (예: ○○중학교 운동장)">
+        <select><option>종목 선택 — 풋살</option><option>축구</option></select>
+        <input type="text" placeholder="위치: 지도에서 핀을 찍어주세요 (현재 위치 사용 가능)">
+        <button class="btn" style="margin-top:10px;padding:10px;font-size:13px" onclick="submitReg(this)">등록 요청 보내기</button>
+      </div>
+    </section>
+
+    <!-- ═══ 구장 ═══ -->
+    <section class="screen" id="scr-venue">
+      <div class="eyebrow">VENUE · 📍 240m</div>
+      <div class="row" style="justify-content:flex-start">
+        <div class="h-title">신촌근린공원 풋살장</div>
+        <span class="pill orange">풋살</span>
+      </div>
+      <div class="sub">이 구장의 매칭은 풋살로 진행 · 이번 달 방문 32명 · 도전 187회 · 홈팀 4팀</div>
+
+      <div class="nameplate">
+        <div class="venue">7월 성주 現</div>
+        <div class="row">
+          <div class="lord">👑 볼차는곰</div>
+          <span class="pill gold">2개월 연속</span>
+        </div>
+        <div class="sub" style="color:#8a6410">월 점수 21 (상위 3주 합산) · 8월 1일 왕좌 리셋</div>
+      </div>
+
+      <div class="seg">
+        <button class="on" onclick="showBoard(0,this)">성주 레이스</button>
+        <button onclick="showBoard(1,this)">점령팀</button>
+        <button onclick="showBoard(2,this)">레코드 TOP5</button>
+      </div>
+
+      <div class="board on" id="board0">
+        <div class="card">
+          <h3>👑 7월 개인 레이스 <span class="pill line">유효 도전 횟수</span></h3>
+          <table>
+            <tr><th>#</th><th>이름</th><th>상위 3주 합산</th><th>이번 주</th></tr>
+            <tr><td class="rank">1</td><td>볼차는곰</td><td class="num">21</td><td>6회</td></tr>
+            <tr><td class="rank">2</td><td>토요풋살러</td><td class="num">18</td><td>5회</td></tr>
+            <tr class="me"><td class="rank">3</td><td>에이스 (나)</td><td class="num">16</td><td>5회</td></tr>
+            <tr><td class="rank">4</td><td>왼발장인</td><td class="num">12</td><td>3회</td></tr>
+          </table>
+          <div class="sub" style="margin-top:8px">💡 하루 2회 상한 덕분에 1위와의 차이(5회)는 이번 주에 뒤집을 수 있어요.</div>
+        </div>
+      </div>
+
+      <div class="board" id="board1">
+        <div class="card tint-g">
+          <h3>🚩 7월 점령팀 레이스 <span class="pill line">팀 합산 유효 도전</span></h3>
+          <table>
+            <tr><th>#</th><th>팀</th><th>합산</th><th>참여</th></tr>
+            <tr><td class="rank">1</td><td>FC 목요일</td><td class="num">54</td><td>7명</td></tr>
+            <tr class="me"><td class="rank">2</td><td>FS 번개 (내 팀)</td><td class="num">49</td><td>6명</td></tr>
+            <tr><td class="rank">3</td><td>신촌 유나이티드</td><td class="num">31</td><td>4명</td></tr>
+          </table>
+          <div class="sub" style="margin-top:8px">🏆 월간 점령팀은 <b>구장 대항전</b> 출전권 — 옆 구장 점령팀과 챔피언 매치.</div>
+        </div>
+      </div>
+
+      <div class="board" id="board2">
+        <div class="card">
+          <h3>⚡ 역대 한 번에 최다 리프팅</h3>
+          <table>
+            <tr><th>#</th><th>이름</th><th>기록</th><th>달성일</th></tr>
+            <tr><td class="rank">1</td><td>발등의신</td><td class="num">112</td><td>3.14</td></tr>
+            <tr><td class="rank">2</td><td>볼차는곰</td><td class="num">87</td><td>5.02</td></tr>
+            <tr><td class="rank">3</td><td>리프팅요정</td><td class="num">64</td><td>4.21</td></tr>
+            <tr><td class="rank">4</td><td>토요풋살러</td><td class="num">51</td><td>6.18</td></tr>
+            <tr><td class="rank">5</td><td>왼발장인</td><td class="num">38</td><td>6.30</td></tr>
+          </table>
+          <div class="goalgrad">🔥 TOP5 진입까지 <span class="num">7</span>개 — 내 최고 31개 → 목표 38개</div>
+          <div class="sub" style="margin-top:8px">구장별 · 지역(구 단위) 레코드 테이블 분리 운영.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 팀 ═══ -->
+    <section class="screen" id="scr-team">
+      <div class="eyebrow">TEAM</div>
+      <div class="row" style="justify-content:flex-start">
+        <div class="h-title">FS 번개</div>
+        <span class="pill orange">풋살팀</span>
+      </div>
+      <div class="sub">홈: 신촌근린공원 풋살장 · 팀원 9명</div>
+
+      <div class="card tint-o">
+        <div class="row">
+          <h3>🔓 공식 매칭 해금 (풋살 = 7명)</h3>
+          <span class="pill line"><b>6 / 7</b>명</span>
+        </div>
+        <div class="sub">풋살은 7명, 축구는 11명이 각자 3주간 유효 도전 6회(주 2회)를 채우면 전적이 기록되는 공식 매칭이 열립니다. <b>1명 남았어요!</b></div>
+        <div style="margin-top:9px" class="bar orange"><i style="width:86%"></i></div>
+        <div style="margin-top:10px">
+          <div class="member"><div class="avatar">에</div>에이스 (나)<span class="st ok">✓ 6/6</span></div>
+          <div class="member"><div class="avatar">번</div>번개주장<span class="st ok">✓ 8/6</span></div>
+          <div class="member"><div class="avatar">외</div>수요풋살왕 외 3명<span class="st ok">✓ 인증 완료</span></div>
+          <div class="member"><div class="avatar">막</div>막내수비수 <span class="pill line" style="font-size:9px">신규 🐣 2개 유효</span><span class="st no">4/6 · 2회 남음</span><button class="poke" onclick="this.textContent='찔렀음 👉';this.disabled=true">찌르기 👉</button></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <h3>⚔️ 최근 경기 · 골 클레임</h3>
+          <span class="confirm-tag">상대팀 확인 완료 ✓</span>
+        </div>
+        <div class="vs">
+          <span>FS 번개</span><span class="score" style="color:var(--grass)">5</span>
+          <span style="color:#9aa79e">:</span>
+          <span class="score">3</span><span>신촌 Utd</span>
+        </div>
+        <div class="sub">주장은 스코어만 등록 → 골 5개 슬롯 자동 생성 → 각자 셀프 클레임 → 48시간 후 자동 확정</div>
+        <div class="slotwrap">
+          <div class="slot claimed"><span class="ballico">⚽</span>번개주장</div>
+          <div class="slot claimed"><span class="ballico">⚽</span>골넣는약사</div>
+          <div class="slot" id="myslot"><span class="ballico">⚽</span>빈 슬롯</div>
+          <div class="slot"><span class="ballico">⚽</span>빈 슬롯</div>
+          <div class="slot"><span class="ballico">⚽</span>빈 슬롯</div>
+        </div>
+        <button class="btn" style="margin-top:10px;padding:10px;font-size:13px" id="claimBtn" onclick="claimGoal()">⚽ 오늘 넣은 내 골 가져가기</button>
+      </div>
+
+      <div class="card tint-g">
+        <div class="row">
+          <h3>🧭 원정 라이선스</h3>
+          <span class="pill green">진행 중</span>
+        </div>
+        <div class="sub">홈 공식 매칭 <b>2/3경기</b> · 상호확인 <b>100%</b> · 노쇼 <b>0건</b> — 1경기 남음. (실력이 아닌 <b>신뢰</b>의 증명)</div>
+        <hr class="divider">
+        <h3 style="font-size:12px">📊 전적 (종목별 분리)</h3>
+        <div class="rec-tabs">
+          <button class="on" onclick="showRec(0,this)">풋살 전적</button>
+          <button onclick="showRec(1,this)">축구 전적</button>
+        </div>
+        <div id="rec0" style="margin-top:8px;font-size:12px;font-weight:700">4승 1무 2패 · Elo 1,048 <span style="color:var(--grass);float:right">비슷한 팀 3팀 추천 →</span></div>
+        <div id="rec1" style="display:none;margin-top:8px;font-size:12px;font-weight:700;color:#9aa79e">아직 축구 공식 경기가 없어요 · 축구 해금 3/11명</div>
+      </div>
+
+      <div class="card">
+        <h3>🗂 내 커리어 <span class="pill line">풋살</span></h3>
+        <div class="row" style="margin-top:8px">
+          <div><div class="sub">출전</div><div class="num" style="font-size:24px">7<span style="font-size:12px">경기</span></div></div>
+          <div><div class="sub">득점</div><div class="num" style="font-size:24px">4<span style="font-size:12px">골</span></div></div>
+          <div><div class="sub">매너</div><div class="num" style="font-size:24px">A</div></div>
+          <button class="poke" onclick="alert('커리어 카드 이미지가 생성됩니다 — 인스타 공유용')">카드 공유</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="tabbar">
+    <button class="on" onclick="go('home',this)"><span class="ico">🏠</span>홈</button>
+    <button onclick="go('challenge',this)"><span class="ico">🎯</span>도전</button>
+    <button onclick="go('map',this)"><span class="ico">🗺️</span>지도</button>
+    <button onclick="go('venue',this)"><span class="ico">🏰</span>구장</button>
+    <button onclick="go('team',this)"><span class="ico">🛡️</span>팀</button>
+  </nav>
+</div>
+
+<div class="footnote">
+  「지도」 탭: 성 마커 3종(내 홈/타 점령/미개장) + 구장 등록 요청 · 「도전」 탭: 도전 시작을 누르면 AI 판정 시뮬레이션.<br>
+  실서비스 지도는 카카오맵 SDK, AI 판정은 온디바이스 포즈 추정 + 볼 검출 + 무릎 기준선 트리거로 구현.
+</div>
+
+<script>
+  function go(name, btn){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+    document.getElementById('scr-'+name).classList.add('on');
+    document.querySelectorAll('.tabbar button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  function goVenueTab(){
+    document.querySelectorAll('.tabbar button').forEach((b,i)=>{b.classList.toggle('on', i===3)});
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));
+    document.getElementById('scr-venue').classList.add('on');
+  }
+  function showBoard(i, btn){
+    document.querySelectorAll('.board').forEach(b=>b.classList.remove('on'));
+    document.getElementById('board'+i).classList.add('on');
+    document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+  function showRec(i, btn){
+    document.getElementById('rec0').style.display = i===0?'block':'none';
+    document.getElementById('rec1').style.display = i===1?'block':'none';
+    document.querySelectorAll('.rec-tabs button').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  }
+
+  // 지도
+  const venues = [
+    {name:'🏰 신촌근린공원 풋살장', sport:'풋살', cls:'orange', sub:'👑 성주: 볼차는곰 · 🚩 점령팀: FC 목요일 · 📍 240m'},
+    {name:'🏰 간석체육공원 축구장', sport:'축구', cls:'green', sub:'👑 성주: 미드필더최 · 🚩 점령팀: 간석FC · 📍 1.8km'},
+    {name:'🏰 구월풋살파크', sport:'풋살', cls:'orange', sub:'👑 성주: 리프팅요정 · 🚩 점령팀: 구월볼러스 · 📍 2.4km'},
+    {name:'🏚️ ○○중학교 운동장 (미개장)', sport:'대기', cls:'line', sub:'등록 승인 완료 — 이 위치에서 첫 GPS 인증 도전이 성립하면 성이 개장됩니다!'},
+  ];
+  function showVenue(i){
+    const v = venues[i];
+    document.getElementById('regform').classList.remove('show');
+    const c = document.getElementById('venuecard');
+    document.getElementById('vc-name').textContent = v.name;
+    const sp = document.getElementById('vc-sport');
+    sp.textContent = v.sport; sp.className = 'pill ' + v.cls;
+    document.getElementById('vc-sub').textContent = v.sub;
+    c.classList.add('show');
+  }
+  function toggleReg(){
+    document.getElementById('venuecard').classList.remove('show');
+    document.getElementById('regform').classList.toggle('show');
+  }
+  function submitReg(btn){
+    btn.textContent = '✓ 요청 완료 — 검토 후 알림을 드릴게요';
+    btn.disabled = true;
+  }
+
+  // AI 카운트 데모 (1일 2회, 1회 사용됨)
+  let attemptsLeft = 1, counting = false;
+  function startChallenge(){
+    if(counting) return;
+    if(attemptsLeft <= 0){ alert('오늘 도전 2회를 모두 사용했어요. 연습 모드는 무제한! 도전은 내일 다시.'); return; }
+    counting = true;
+    const cam = document.getElementById('cam'), countEl = document.getElementById('count');
+    const btn = document.getElementById('startBtn'), result = document.getElementById('resultCard');
+    result.classList.remove('show');
+    cam.classList.add('counting');
+    btn.disabled = true; btn.textContent = 'AI 판정 중…';
+    let n = 0;
+    const target = 11 + Math.floor(Math.random()*24);
+    const tick = setInterval(()=>{
+      n++; countEl.textContent = n;
+      if(n >= target){
+        clearInterval(tick);
+        cam.classList.remove('counting');
+        counting = false; attemptsLeft--;
+        const pb = 31, isPB = target > pb;
+        document.getElementById('resultNum').textContent =
+          target + '개 · ' + (isPB ? '개인 최고 경신! 🎉' : '유효 도전!');
+        document.getElementById('resultSub').textContent = isPB
+          ? '신기록 클립이 자동 저장됐어요. 구장 레코드 TOP5까지 ' + Math.max(38-target,0) + '개!'
+          : '신촌근린공원 풋살장 보드에 반영. 성주 레이스 점수 +1.';
+        result.classList.add('show');
+        btn.disabled = true;
+        btn.textContent = '오늘 도전 소진 — 내일 다시!';
+      }
+    }, 380);
+  }
+
+  function claimGoal(){
+    const slot = document.getElementById('myslot');
+    if(slot.classList.contains('claimed')) return;
+    slot.classList.add('claimed');
+    slot.innerHTML = '<span class="ballico">⚽</span>에이스 (나)';
+    const btn = document.getElementById('claimBtn');
+    btn.textContent = '✓ 클레임 완료 — 48시간 후 자동 확정';
+    btn.disabled = true;
+  }
+</script>
+</body>
+</html>
