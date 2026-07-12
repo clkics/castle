@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.3</title>
+<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.4</title>
 <style>
   :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; --ok:#3DDC84; --bad:#FF5A47; }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -15,12 +15,8 @@
   video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   canvas{z-index:2}
   .mirror{transform:scaleX(-1)}
-
-  /* ★ 원거리 가시성: 볼 추적 상태 스트립 (상단 전체폭) */
   #trackbar{position:absolute;z-index:4;top:0;left:0;right:0;height:16px;background:#666;transition:background .15s}
   #trackbar.ok{background:var(--ok)} #trackbar.roi{background:var(--crown)} #trackbar.lost{background:var(--bad)}
-
-  /* ★ 원거리 가시성: 초대형 카운트 */
   .count{position:absolute;z-index:3;top:22px;left:0;right:0;text-align:center;pointer-events:none;
     font-size:min(30vw,170px);font-weight:900;line-height:1;color:#fff;text-shadow:0 3px 18px rgba(0,0,0,.75)}
   .count.pop{animation:pop .25s ease}
@@ -28,14 +24,11 @@
   #flash{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;transition:opacity .35s}
   #flash.g{background:radial-gradient(circle, transparent 35%, rgba(61,220,132,.55));opacity:1;transition:none}
   #flash.r{background:radial-gradient(circle, transparent 35%, rgba(255,90,71,.6));opacity:1;transition:none}
-
   .stat{position:absolute;z-index:3;right:10px;top:24px;font-size:10px;text-align:right;color:#B8C9BD;background:rgba(0,0,0,.4);border-radius:8px;padding:5px 8px;line-height:1.6;pointer-events:none}
   .stat .warn{color:#F5B090}
-  /* ★ 원거리 가시성: 대형 메시지 */
   .msg{position:absolute;z-index:3;bottom:12px;left:10px;right:10px;text-align:center;
     font-size:17px;font-weight:900;background:rgba(0,0,0,.55);border-radius:12px;padding:11px 8px;pointer-events:none;line-height:1.35}
   .msg.alert{background:rgba(194,69,45,.85)}
-
   .controls{display:flex;gap:7px;width:100%;max-width:540px;margin-top:12px;flex-wrap:wrap}
   button{padding:13px 6px;border-radius:12px;border:none;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit}
   #btnStart{flex:1 1 100%;background:var(--ball);color:#fff;font-size:16px}
@@ -55,9 +48,9 @@
 </style>
 </head>
 <body>
-<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.3</h1>
-<p class="note">v0.3: 다리 주변 확대탐색(전신 거리 인식 개선) · <b>음성 카운트</b> · 초대형 숫자/메시지 · 상단 <b>추적 스트립</b>(초록=추적중/노랑=확대추적/빨강=놓침) · 복구 카운트<br>
-<b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요 — 카운트마다 숫자를 읽어줍니다.</p>
+<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.4</h1>
+<p class="note">v0.4: 판정 엔진 교체 — <b>궤적 반전 기반</b>(무릎선 크로싱 폐기). 실제 리프팅 영상으로 검증 완료(3터치 3카운트 · 운반 오탐 0 · 손바운스 치팅 차단).<br>
+공을 들고 이동해도 아무 일도 일어나지 않습니다. <b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요.</p>
 
 <div class="stage">
   <div id="loading"><div class="spin"></div><span id="loadmsg">AI 모델 불러오는 중… (첫 실행 10~20초)</span></div>
@@ -88,9 +81,9 @@
 </div>
 
 <div class="tips">
-  <b>v0.3 탐색 로직</b> — ① 포즈로 다리 영역을 찾아 <b>그 부분만 확대해서 공을 탐색</b>(전신 거리에서도 공의 유효 해상도 확보) ② 공을 잡으면 마지막 위치 중심 추적(ROI) ③ 사람 크기로 공의 예상 크기를 계산해 오검출 걸러냄 ④ 검출이 끊겼다 위쪽에서 상승 중으로 재발견되면 <b>복구 카운트</b> ⑤ 🌀 모션보조(실험): 검출 실패 시 움직임 기반 재포착.<br>
-  <b>원거리 확인법</b> — 상단 색 스트립: <b style="color:#3DDC84">초록=공 추적 중</b> · <b style="color:#D9A02B">노랑=확대 추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. 카운트는 음성으로 읽어줍니다.<br>
-  <b>손 사용 거부</b> — v0.2와 동일(손목 근접 시 카운트 제외, 3회 무효).
+  <b>v0.4 판정 엔진 (실영상 검증)</b> — 터치 = 공 궤적의 <b>하강→상승 반전</b>. 조건: ① 반전 지점이 골반 아래 구간 ② 낙하 거리 충분 ③ <b>반전 직전까지 가속 낙하 + 급반전</b>(발로 찬 공의 물리 특성 — 손에 든 공은 반전 전에 감속하므로 자동 배제) ④ 최근 궤적이 손목에 지속적으로 붙어있으면(부착률 90%↑) 카운트 대신 손사용 플래그.<br>
+  <b>바뀐 점</b> — 무릎선 크로싱 규칙 폐기(발을 들어 허벅지 높이에서 차는 스타일도 카운트됨). 순간 손목근접 판정 폐지(공 들고 이동 시 오탐 제거).<br>
+  <b>원거리 확인</b> — 상단 스트립: <b style="color:#3DDC84">초록=추적</b> · <b style="color:#D9A02B">노랑=확대추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. 카운트는 음성으로 읽어줍니다. <b>전신(머리~발)이 보여야 카운트됩니다.</b>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -104,18 +97,23 @@ const off = document.createElement('canvas'), octx = off.getContext('2d', { will
 const mot = document.createElement('canvas'), mctx = mot.getContext('2d', { willReadFrequently: true });
 
 let ssdModel = null, poseDetector = null, hqMode = false, switching = false;
-let voiceOn = true, motionOn = false;
-let facing = 'user';
-let running = false, count = 0, handFlags = 0, recoveryCounts = 0, motionAssists = 0;
-let kneeY = null, wrists = [];
-let body = null;              // {cx, hy, ay, h, w, expR} 포즈 기반 신체 정보
-let ballAbove = false, lastCountAt = 0, gapFlag = false;
-let lastBall = null, lastBallSeen = 0, prevSample = null, lostSaid = false;
-let handDistLog = [];
-let prevMotion = null;        // 모션보조용 이전 프레임
+let voiceOn = true, motionOn = false, facing = 'user';
+let running = false, count = 0, handFlags = 0, motionAssists = 0;
+let wrists = [], body = null;          // body: {cx, hy, ay, h, w, knees, ankles, expR}
+let lastBall = null, lastBallSeen = 0, lostSaid = false;
+let prevMotion = null;
 let frames = 0, fps = 0, lastFpsAt = performance.now(), frameIdx = 0;
 let audioCtx = null;
 const PERSONAL_BEST = 31, NEW_USER = false;
+
+// ── v0.4 판정 상태 ──
+let S = [];            // 공 샘플 {t, y}
+let attArr = [];       // 손목 부착 여부(0/1) 최근 12샘플
+let jstate = null;     // 'down' | 'up'
+let extMax = null, extMaxT = 0, extMin = null;
+let vmaxFall = 0, vinExt = null;
+let pend = null;       // {t0, y0, att} — 반전 후 상승 확인 대기
+let lastCountAt = 0;
 
 const clamp = (v,a,b)=>Math.min(Math.max(v,a),b);
 function tone(f,d,g){ try{
@@ -138,20 +136,17 @@ function speak(text){
 }
 function flash(kind){
   const f = $('flash');
-  f.className = kind;                    // 'g' | 'r'
+  f.className = kind;
   requestAnimationFrame(()=>requestAnimationFrame(()=>{ f.className = ''; }));
 }
-
 function setMirror(){
   const on = (facing === 'user');
   video.classList.toggle('mirror', on);
   overlay.classList.toggle('mirror', on);
 }
-
 async function loadSsd(){
   ssdModel = await cocoSsd.load({ base: hqMode ? 'mobilenet_v2' : 'lite_mobilenet_v2' });
 }
-
 async function loadModels(){
   try{
     $('loadmsg').textContent = 'AI 모델 불러오는 중… (1/2 볼 검출)';
@@ -168,7 +163,6 @@ async function loadModels(){
     $('loadmsg').innerHTML = '모델/카메라 로드 실패 😢<br><span style="font-weight:400;font-size:11px">크롬에서 직접 열었는지, 카메라 권한 허용했는지 확인.<br>(' + e.message + ')</span>';
   }
 }
-
 async function startCamera(){
   if(video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); }
   const stream = await navigator.mediaDevices.getUserMedia({
@@ -180,7 +174,6 @@ async function startCamera(){
   overlay.width = video.videoWidth; overlay.height = video.videoHeight;
   setMirror();
 }
-
 $('btnCam').onclick = async () => {
   facing = (facing === 'user') ? 'environment' : 'user';
   try{ await startCamera(); }catch(e){ facing = 'user'; await startCamera().catch(()=>{}); }
@@ -205,9 +198,15 @@ $('btnHQ').onclick = async () => {
   switching = false;
 };
 
+function resetJudge(){
+  S = []; attArr = []; jstate = null;
+  extMax = null; extMaxT = 0; extMin = null;
+  vmaxFall = 0; vinExt = null; pend = null;
+}
+
 $('btnStart').onclick = () => {
-  count = 0; handFlags = 0; recoveryCounts = 0; motionAssists = 0;
-  ballAbove = false; lastCountAt = 0; handDistLog = []; gapFlag = false; prevSample = null;
+  count = 0; handFlags = 0; motionAssists = 0; lastCountAt = 0;
+  resetJudge();
   running = true;
   tone(660,.06);
   speak('도전 시작');
@@ -229,17 +228,20 @@ function say(text, alert){
     msgTimer = setTimeout(()=>m.classList.remove('alert'), 1400);
   }
 }
-
-function addCount(kind){
+function addCount(){
   count++;
   $('count').textContent = count;
   const w = $('countWrap');
   w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
   beep(); flash('g');
   speak(String(count));
-  if(kind === 'recovery'){ recoveryCounts++; }
 }
-
+function flagHand(){
+  handFlags++; buzz(); flash('r');
+  speak('손 사용');
+  say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
+  if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); }
+}
 function endSession(reason){
   running = false;
   $('btnStart').style.display = 'block';
@@ -256,7 +258,6 @@ function endSession(reason){
   else{ tag.textContent = '무효 (기준 ' + minValid + '개)'; tag.className = 'tag invalid'; speak('종료. ' + count + '개'); }
   $('resSub').textContent = '종료: ' + reason +
     (handFlags ? ' · 손감지 ' + handFlags : '') +
-    (recoveryCounts ? ' · 복구카운트 ' + recoveryCounts : '') +
     (motionAssists ? ' · 모션보조 ' + motionAssists : '');
   $('result').style.display = 'block';
   say('다시 도전하려면 시작을 누르세요');
@@ -279,32 +280,31 @@ function sizeOK(r){
   return r > body.expR * 0.35 && r < body.expR * 3.2;
 }
 
-// ── 모션보조 (실험): 마지막 공 주변 프레임차 블롭 ──
+// ── 모션보조 (실험) ──
 function motionBlob(now){
   if(!motionOn || !lastBall || now - lastBallSeen > 1500 || !body) return null;
-  const S = 96;
+  const S2 = 96;
   const side = clamp((body.expR||20) * 10, 200, Math.min(video.videoWidth, video.videoHeight));
   const rx = clamp(lastBall.x - side/2, 0, video.videoWidth - side);
   const ry = clamp(lastBall.y - side/2, 0, video.videoHeight - side);
-  mot.width = mot.height = S;
-  mctx.drawImage(video, rx, ry, side, side, 0, 0, S, S);
-  const cur = mctx.getImageData(0, 0, S, S);
+  mot.width = mot.height = S2;
+  mctx.drawImage(video, rx, ry, side, side, 0, 0, S2, S2);
+  const cur = mctx.getImageData(0, 0, S2, S2);
   let result = null;
   if(prevMotion && prevMotion.rx === rx && prevMotion.ry === ry){
     let sx=0, sy=0, n=0;
     const a = cur.data, b = prevMotion.data;
-    for(let i=0;i<S*S;i++){
+    for(let i=0;i<S2*S2;i++){
       const j=i*4;
       const d = Math.abs(a[j]-b[j]) + Math.abs(a[j+1]-b[j+1]) + Math.abs(a[j+2]-b[j+2]);
-      if(d > 90){ sx += i%S; sy += (i/S)|0; n++; }
+      if(d > 90){ sx += i%S2; sy += (i/S2)|0; n++; }
     }
-    const k = side/S, expPx = (body.expR*2)/k;   // 예상 공 지름(모션 좌표계)
+    const k = side/S2, expPx = (body.expR*2)/k;
     if(n > expPx*expPx*0.25 && n < expPx*expPx*4){
       const bx = rx + (sx/n)*k, by = ry + (sy/n)*k;
-      // 발/무릎 근처 블롭 제외(다리 움직임 오인 방지)
       const nearLimb = [...(body.ankles||[]), ...(body.knees||[])].some(p => Math.hypot(bx-p.x, by-p.y) < body.expR*1.4);
       if(!nearLimb && Math.hypot(bx-lastBall.x, by-lastBall.y) < body.expR*8){
-        result = { x: bx, y: by, r: lastBall.r, score: 0, src: 'motion' };
+        result = { x: bx, y: by, r: lastBall.r, score: 0 };
       }
     }
   }
@@ -312,12 +312,10 @@ function motionBlob(now){
   return result;
 }
 
-// ── 볼 탐색 파이프라인: 추적ROI → 다리영역 확대 → 전체 ──
+// ── 볼 탐색 파이프라인: 추적ROI → 다리영역 확대 → 전체 → 모션 ──
 async function detectBall(now){
   const vw = video.videoWidth, vh = video.videoHeight;
   let found = null, src = 'full';
-
-  // 1) 추적 ROI (직전 위치 주변 확대)
   if(lastBall && now - lastBallSeen < 1200 && frameIdx % 14 !== 0){
     const side = clamp(lastBall.r * 9, 240, Math.min(vw, vh));
     const rx = clamp(lastBall.x - side/2, 0, vw - side);
@@ -325,16 +323,14 @@ async function detectBall(now){
     const c = (await detectInRegion(rx, ry, side, 0.18)).filter(d => sizeOK(d.r));
     if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'roi'; }
   }
-  // 2) ★ 포즈 기반 다리영역 확대 탐색 (원거리 최초 포착의 핵심)
   if(!found && body){
     const side = clamp(Math.max(body.w * 3.2, body.h * 0.75), 260, Math.min(vw, vh));
-    const cy = (body.hy + body.ay) / 2 + body.h * 0.08;   // 무릎~발 중심 약간 아래
+    const cy = (body.hy + body.ay) / 2 + body.h * 0.08;
     const rx = clamp(body.cx - side/2, 0, vw - side);
     const ry = clamp(cy - side/2, 0, vh - side);
     const c = (await detectInRegion(rx, ry, side, 0.15)).filter(d => sizeOK(d.r));
     if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'leg'; }
   }
-  // 3) 전체 프레임 (백업 / 주기 스캔)
   if(!found){
     let dets = [];
     try{ dets = await ssdModel.detect(video, 5, 0.28); }catch(e){}
@@ -343,13 +339,83 @@ async function detectBall(now){
       .filter(d => sizeOK(d.r));
     if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'full'; }
   }
-  // 4) 모션보조 (실험)
   if(!found){
     const m = motionBlob(now);
     if(m){ found = m; src = 'motion'; motionAssists++; }
   }
   if(found) found.src = src;
   return found;
+}
+
+// ── v0.4 판정 엔진: 반전 + 선명도 + 부착률 ──
+function judge(now, ball){
+  if(!running || !ball || !body) return;
+  const bodyH = body.h, hipY = body.hy;
+  const floor = bodyH * 0.0009;           // px/ms — 최소 낙하/상승 속도
+  const hys = bodyH * 0.035;
+
+  const wd = wrists.length ? Math.min(...wrists.map(w => Math.hypot(ball.x - w.x, ball.y - w.y))) : 999;
+  attArr.push(wd < body.expR * 2.4 ? 1 : 0);
+  if(attArr.length > 12) attArr.shift();
+  const attm = attArr.length >= 6 ? attArr.reduce((a,b)=>a+b,0) / attArr.length : 0;
+
+  S.push({ t: now, y: ball.y });
+  if(S.length > 16) S.shift();
+
+  // 반전 후 상승 확인 대기
+  if(pend){
+    if(now - pend.t0 <= 380){
+      let vo = null;
+      for(const s of S){
+        if(s.t > pend.t0){
+          const v = (pend.y0 - s.y) / (s.t - pend.t0);
+          vo = vo === null ? v : Math.max(vo, v);
+        }
+      }
+      if(vo !== null && vo > floor * 0.7){
+        if(pend.t0 - lastCountAt > 280){
+          if(pend.att >= 0.9){ flagHand(); if(!running) return; }
+          else { addCount(); lastCountAt = pend.t0; }
+        }
+        pend = null;
+      }
+    } else { pend = null; }
+  }
+
+  if(extMax === null){
+    extMax = ball.y; extMaxT = now; extMin = ball.y; jstate = 'down';
+    return;
+  }
+  if(jstate === 'down'){
+    if(ball.y >= extMax){
+      // 새 극대 → 진입 속도 갱신
+      let vi = null;
+      const prevs = S.slice(0, -1).slice(-3);
+      for(const s of prevs){
+        const v = (ball.y - s.y) / (now - s.t);
+        vi = vi === null ? v : Math.max(vi, v);
+      }
+      if(vi !== null){ vinExt = vi; if(vi > 0) vmaxFall = Math.max(vmaxFall, vi); }
+      extMax = ball.y; extMaxT = now;
+    } else if(extMax - ball.y > hys){
+      const fall = extMax - extMin;
+      const gate = extMax > hipY - 0.12 * bodyH;
+      const sharp = vinExt !== null && vinExt > Math.max(floor, 0.4 * vmaxFall);
+      if(gate && fall > 0.10 * bodyH){
+        if(sharp){
+          pend = { t0: extMaxT, y0: extMax, att: attm };
+        } else if(attm >= 0.8){
+          flagHand(); if(!running) return;
+        }
+      }
+      jstate = 'up'; extMin = ball.y; vmaxFall = 0; vinExt = null;
+    }
+  } else {
+    if(ball.y < extMin) extMin = ball.y;
+    else if(ball.y - extMin > hys){
+      jstate = 'down'; extMax = ball.y; extMaxT = now; vmaxFall = 0; vinExt = null;
+    }
+  }
 }
 
 async function loop(){
@@ -359,19 +425,17 @@ async function loop(){
   const now = performance.now();
   if(now - lastFpsAt >= 1000){ fps = frames; frames = 0; lastFpsAt = now; }
 
-  // 포즈: 4프레임마다
   if(frameIdx % 4 === 1 && poseDetector){
     try{
       const poses = await poseDetector.estimatePoses(video);
       if(poses[0]){
         const kp = poses[0].keypoints;
         const pick = n => { const k = kp.find(p=>p.name===n); return (k && k.score > 0.3) ? k : null; };
-        const knees = [pick('left_knee'), pick('right_knee')].filter(Boolean);
-        if(knees.length){ kneeY = knees.reduce((s,k)=>s+k.y,0)/knees.length; }
         wrists = [pick('left_wrist'), pick('right_wrist')].filter(Boolean);
         const nose = pick('nose');
         const hips = [pick('left_hip'), pick('right_hip')].filter(Boolean);
         const ankles = [pick('left_ankle'), pick('right_ankle')].filter(Boolean);
+        const knees = [pick('left_knee'), pick('right_knee')].filter(Boolean);
         if(nose && hips.length && ankles.length){
           const hy = hips.reduce((s,k)=>s+k.y,0)/hips.length;
           const ay = ankles.reduce((s,k)=>s+k.y,0)/ankles.length;
@@ -379,8 +443,7 @@ async function loop(){
           const h = ay - nose.y;
           const xs = [...hips, ...ankles, ...knees].map(k=>k.x);
           const w = Math.max(60, Math.max(...xs) - Math.min(...xs));
-          body = { cx, hy, ay, h, w, knees, ankles,
-                   expR: clamp(h * 0.065, 7, 90) };
+          body = { cx, hy, ay, h, w, knees, ankles, expR: clamp(h * 0.065, 7, 90) };
         }
       }
     }catch(e){}
@@ -388,51 +451,10 @@ async function loop(){
 
   const gapBefore = now - lastBallSeen;
   const ball = await detectBall(now);
-  let vy = null;
   if(ball){
-    if(gapBefore > 300) gapFlag = true;
-    if(prevSample && now - prevSample.t < 220){ vy = (ball.y - prevSample.y) / (now - prevSample.t); }
-    prevSample = { y: ball.y, t: now };
+    if(gapBefore > 1200) resetJudge();   // 오래 놓친 뒤 재발견 → 판정 상태 초기화
     lastBall = ball; lastBallSeen = now; lostSaid = false;
-  }
-
-  // 공↔손목 거리 이력
-  if(ball && wrists.length){
-    const d = Math.min(...wrists.map(w => Math.hypot(ball.x - w.x, ball.y - w.y)));
-    handDistLog.push({ t: now, d });
-  }
-  handDistLog = handDistLog.filter(e => now - e.t < 400);
-
-  // ── 카운팅 상태기계 ──
-  if(running && ball && kneeY !== null){
-    const ABOVE = ball.y < kneeY - 12;
-    const BELOW = ball.y > kneeY + 12;
-    const th = Math.max(55, ball.r * 2.6);
-    const recentMin = handDistLog.length ? Math.min(...handDistLog.map(e=>e.d)) : null;
-    const handNear = recentMin !== null && recentMin < th;
-
-    if(ABOVE && !ballAbove && now - lastCountAt > 250){
-      ballAbove = true; lastCountAt = now;
-      if(handNear){
-        handFlags++; buzz(); flash('r');
-        speak('손 사용'); say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
-        if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); return; }
-      }else{
-        addCount('normal'); gapFlag = false;
-      }
-    }
-    // ★ 복구 카운트: 아래 구간을 못 본 채(검출 공백) 위에서 상승 중으로 재발견
-    else if(ABOVE && ballAbove && gapFlag && vy !== null && vy < -0.45 && now - lastCountAt > 450){
-      lastCountAt = now; gapFlag = false;
-      if(handNear){
-        handFlags++; buzz(); flash('r');
-        say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
-        if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); return; }
-      }else{
-        addCount('recovery');
-      }
-    }
-    else if(BELOW && ballAbove){ ballAbove = false; }
+    judge(now, ball);
   }
 
   if(running && !ball && now - lastBallSeen > 1200 && !lostSaid && count > 0){
@@ -445,31 +467,34 @@ async function loop(){
   // ── 추적 스트립 + 오버레이 ──
   const tb = $('trackbar');
   if(now - lastBallSeen < 350 && lastBall){
-    tb.className = (lastBall.src === 'roi' || lastBall.src === 'leg' || lastBall.src === 'motion') ? 'roi' : 'ok';
-    if(lastBall.src === 'full') tb.className = 'ok';
+    tb.className = (lastBall.src === 'full') ? 'ok' : 'roi';
   } else {
     tb.className = 'lost';
   }
 
   ctx.clearRect(0,0,overlay.width,overlay.height);
-  if(kneeY !== null){
+  if(body){
+    const gateY = body.hy - 0.12 * body.h;   // 터치 인정선(이 아래에서 반전해야 카운트)
     ctx.setLineDash([10,8]); ctx.strokeStyle = '#F2691D'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(0,kneeY); ctx.lineTo(overlay.width,kneeY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,gateY); ctx.lineTo(overlay.width,gateY); ctx.stroke();
     ctx.setLineDash([]);
   }
   if(ball){
-    ctx.strokeStyle = ballAbove ? '#B9F04A' : '#FFFFFF'; ctx.lineWidth = 5;
+    ctx.strokeStyle = (jstate === 'up') ? '#B9F04A' : '#FFFFFF'; ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r + 5, 0, Math.PI*2); ctx.stroke();
   }
+  const attPct = attArr.length ? Math.round(attArr.reduce((a,b)=>a+b,0)/attArr.length*100) : 0;
   $('stat').innerHTML = 'FPS ' + fps + (hqMode?' 🎯':'') +
     '<br>볼 ' + (ball ? (ball.score*100|0) + '% ' + ball.src : '<span class="warn">—</span>') +
-    '<br>예상r ' + (body ? (body.expR|0) + 'px' : '—') +
+    '<br>부착 ' + attPct + '% · ' + (jstate||'—') +
     (handFlags ? '<br><span class="warn">손감지 ' + handFlags + '</span>' : '');
 
   if(!running){
-    if(kneeY === null){ say('전신이 보이게 서 주세요'); }
+    if(!body){ say('전신(머리~발)이 보이게 서 주세요'); }
     else if(!ball && now - lastBallSeen > 800){ say('공을 발 앞에 두세요 (상단 스트립: 빨강=놓침)'); }
     else { say('준비 완료! 시작을 누르세요'); }
+  } else if(!body){
+    say('전신이 보여야 카운트돼요 — 조금 뒤로!', true);
   }
 }
 
