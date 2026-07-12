@@ -3,66 +3,82 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.2</title>
+<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.3</title>
 <style>
-  :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; }
+  :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; --ok:#3DDC84; --bad:#FF5A47; }
   *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0C1A13;color:#E9EFE6;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px}
-  h1{font-size:18px;font-weight:900;margin-bottom:2px}
+  body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0C1A13;color:#E9EFE6;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:12px}
+  h1{font-size:17px;font-weight:900;margin-bottom:2px}
   h1 span{color:var(--ball)}
-  .note{font-size:11px;color:#9FB3A5;text-align:center;line-height:1.5;margin-bottom:10px;max-width:520px}
-  .stage{position:relative;width:100%;max-width:520px;aspect-ratio:3/4;background:#000;border-radius:16px;overflow:hidden;border:1.5px solid #2C4437}
+  .note{font-size:11px;color:#9FB3A5;text-align:center;line-height:1.5;margin-bottom:8px;max-width:540px}
+  .stage{position:relative;width:100%;max-width:540px;aspect-ratio:3/4;background:#000;border-radius:16px;overflow:hidden;border:1.5px solid #2C4437}
   video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   canvas{z-index:2}
   .mirror{transform:scaleX(-1)}
-  .hud{position:absolute;z-index:3;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
-  .count{font-size:64px;font-weight:900;line-height:1;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}
-  .count small{font-size:13px;font-weight:700;display:block;color:#B9F0CE}
-  .stat{font-size:10px;text-align:right;color:#B8C9BD;background:rgba(0,0,0,.35);border-radius:8px;padding:5px 8px;line-height:1.6}
+
+  /* ★ 원거리 가시성: 볼 추적 상태 스트립 (상단 전체폭) */
+  #trackbar{position:absolute;z-index:4;top:0;left:0;right:0;height:16px;background:#666;transition:background .15s}
+  #trackbar.ok{background:var(--ok)} #trackbar.roi{background:var(--crown)} #trackbar.lost{background:var(--bad)}
+
+  /* ★ 원거리 가시성: 초대형 카운트 */
+  .count{position:absolute;z-index:3;top:22px;left:0;right:0;text-align:center;pointer-events:none;
+    font-size:min(30vw,170px);font-weight:900;line-height:1;color:#fff;text-shadow:0 3px 18px rgba(0,0,0,.75)}
+  .count.pop{animation:pop .25s ease}
+  @keyframes pop{40%{transform:scale(1.18)}}
+  #flash{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;transition:opacity .35s}
+  #flash.g{background:radial-gradient(circle, transparent 35%, rgba(61,220,132,.55));opacity:1;transition:none}
+  #flash.r{background:radial-gradient(circle, transparent 35%, rgba(255,90,71,.6));opacity:1;transition:none}
+
+  .stat{position:absolute;z-index:3;right:10px;top:24px;font-size:10px;text-align:right;color:#B8C9BD;background:rgba(0,0,0,.4);border-radius:8px;padding:5px 8px;line-height:1.6;pointer-events:none}
   .stat .warn{color:#F5B090}
-  .msg{position:absolute;z-index:3;bottom:12px;left:12px;right:12px;text-align:center;font-size:12px;font-weight:700;background:rgba(0,0,0,.45);border-radius:10px;padding:8px;pointer-events:none;transition:background .2s}
-  .msg.alert{background:rgba(194,69,45,.75)}
-  .controls{display:flex;gap:8px;width:100%;max-width:520px;margin-top:12px}
-  button{padding:14px 6px;border-radius:12px;border:none;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit}
-  #btnStart{flex:1;background:var(--ball);color:#fff}
-  #btnStop{flex:1;background:#fff;color:var(--ink);display:none}
-  #btnCam{flex:0 0 52px;background:#22382C;color:#fff;font-size:17px}
-  #btnHQ{flex:0 0 92px;background:#22382C;color:#fff;font-size:12px}
-  #btnHQ.on{background:var(--crown);color:#1d1503}
-  button:disabled{opacity:.4}
-  .result{display:none;width:100%;max-width:520px;margin-top:12px;background:#132920;border:1.5px solid var(--grass);border-radius:14px;padding:14px;text-align:center}
+  /* ★ 원거리 가시성: 대형 메시지 */
+  .msg{position:absolute;z-index:3;bottom:12px;left:10px;right:10px;text-align:center;
+    font-size:17px;font-weight:900;background:rgba(0,0,0,.55);border-radius:12px;padding:11px 8px;pointer-events:none;line-height:1.35}
+  .msg.alert{background:rgba(194,69,45,.85)}
+
+  .controls{display:flex;gap:7px;width:100%;max-width:540px;margin-top:12px;flex-wrap:wrap}
+  button{padding:13px 6px;border-radius:12px;border:none;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit}
+  #btnStart{flex:1 1 100%;background:var(--ball);color:#fff;font-size:16px}
+  #btnStop{flex:1 1 100%;background:#fff;color:var(--ink);display:none;font-size:16px}
+  .sub-controls{display:flex;gap:7px;width:100%;max-width:540px;margin-top:7px}
+  .sub-controls button{flex:1;background:#22382C;color:#fff;font-size:12px}
+  .sub-controls button.on{background:var(--crown);color:#1d1503}
+  .result{display:none;width:100%;max-width:540px;margin-top:12px;background:#132920;border:1.5px solid var(--grass);border-radius:14px;padding:14px;text-align:center}
   .result .big{font-size:34px;font-weight:900;color:#B9F0CE}
   .result .tag{display:inline-block;margin-top:6px;font-size:12px;font-weight:900;padding:4px 12px;border-radius:99px;background:var(--grass);color:#fff}
-  .result .tag.invalid{background:#5a5f5b}
-  .result .tag.flag{background:#C2452D}
-  .tips{width:100%;max-width:520px;margin-top:12px;font-size:11px;color:#9FB3A5;line-height:1.7;background:#10231A;border-radius:12px;padding:12px}
+  .result .tag.invalid{background:#5a5f5b} .result .tag.flag{background:#C2452D}
+  .tips{width:100%;max-width:540px;margin-top:12px;font-size:11px;color:#9FB3A5;line-height:1.7;background:#10231A;border-radius:12px;padding:12px}
   .tips b{color:#DCE7DE}
-  #loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0C1A13;font-size:13px;font-weight:700;gap:10px;text-align:center;padding:20px}
+  #loading{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0C1A13;font-size:13px;font-weight:700;gap:10px;text-align:center;padding:20px}
   .spin{width:26px;height:26px;border-radius:50%;border:3px solid #2C4437;border-top-color:var(--ball);animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.2</h1>
-<p class="note">v0.2: 셀카 기본 + 카운트 효과음 · 🖐 손 사용 감지(손목 근접 거부) · 원거리 인식 개선(ROI 추적 + 고정밀 모드)<br>
-<b>⚠ 다운로드 후 크롬에서 직접 열어야 카메라가 작동합니다.</b></p>
+<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.3</h1>
+<p class="note">v0.3: 다리 주변 확대탐색(전신 거리 인식 개선) · <b>음성 카운트</b> · 초대형 숫자/메시지 · 상단 <b>추적 스트립</b>(초록=추적중/노랑=확대추적/빨강=놓침) · 복구 카운트<br>
+<b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요 — 카운트마다 숫자를 읽어줍니다.</p>
 
 <div class="stage">
   <div id="loading"><div class="spin"></div><span id="loadmsg">AI 모델 불러오는 중… (첫 실행 10~20초)</span></div>
   <video id="video" class="mirror" playsinline muted></video>
   <canvas id="overlay" class="mirror"></canvas>
-  <div class="hud">
-    <div class="count"><span id="count">0</span><small id="countLabel">대기 중</small></div>
-    <div class="stat" id="stat">FPS —<br>볼 —<br>무릎 —<br>거리 —</div>
-  </div>
-  <div class="msg" id="msg">시작을 누르고, 전신과 공이 화면에 들어오게 서 주세요</div>
+  <div id="trackbar"></div>
+  <div id="flash"></div>
+  <div class="count" id="countWrap"><span id="count">0</span></div>
+  <div class="stat" id="stat">FPS —</div>
+  <div class="msg" id="msg">시작을 누르세요</div>
 </div>
 
 <div class="controls">
   <button id="btnStart">▶ 도전 시작</button>
   <button id="btnStop">■ 종료</button>
-  <button id="btnHQ" title="정확도 우선 모델로 전환 (조금 느려짐)">🎯 고정밀 OFF</button>
-  <button id="btnCam" title="카메라 전환">🔄</button>
+</div>
+<div class="sub-controls">
+  <button id="btnVoice" class="on">🔊 음성 ON</button>
+  <button id="btnHQ">🎯 고정밀 OFF</button>
+  <button id="btnMotion">🌀 모션보조 OFF</button>
+  <button id="btnCam">🔄 카메라</button>
 </div>
 
 <div class="result" id="result">
@@ -72,9 +88,9 @@
 </div>
 
 <div class="tips">
-  <b>v0.2 판정 로직</b> — 카운트 조건: 공이 무릎 기준선 아래→위 통과(디바운스 250ms) <b>그리고</b> 직전 0.4초간 공이 손목에서 충분히 떨어져 있었을 것. 손목 근처에서 움직인 공은 <b>🖐 손 사용으로 거부</b>되고, 한 세션에서 3회 이상 감지되면 도전 전체가 무효 처리됩니다.<br>
-  <b>거리 가이드</b> — 우측 상단 '거리'가 <b>적정</b>일 때가 최적(화면 세로의 45~80%에 전신). 멀어지면 공이 작아져 인식률이 떨어지므로, 공을 놓치면 마지막 위치 주변을 확대 탐색(ROI)해 재포착합니다. 그래도 부족하면 🎯 고정밀 모드를 켜세요(더 정확, 조금 느림).<br>
-  <b>MVP 규칙</b> — 발 리프팅만 카운트합니다(허벅지·헤딩은 기준선 위에서만 움직여 카운트되지 않음 — 의도된 동작).
+  <b>v0.3 탐색 로직</b> — ① 포즈로 다리 영역을 찾아 <b>그 부분만 확대해서 공을 탐색</b>(전신 거리에서도 공의 유효 해상도 확보) ② 공을 잡으면 마지막 위치 중심 추적(ROI) ③ 사람 크기로 공의 예상 크기를 계산해 오검출 걸러냄 ④ 검출이 끊겼다 위쪽에서 상승 중으로 재발견되면 <b>복구 카운트</b> ⑤ 🌀 모션보조(실험): 검출 실패 시 움직임 기반 재포착.<br>
+  <b>원거리 확인법</b> — 상단 색 스트립: <b style="color:#3DDC84">초록=공 추적 중</b> · <b style="color:#D9A02B">노랑=확대 추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. 카운트는 음성으로 읽어줍니다.<br>
+  <b>손 사용 거부</b> — v0.2와 동일(손목 근접 시 카운트 제외, 3회 무효).
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -84,29 +100,47 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const video = $('video'), overlay = $('overlay'), ctx = overlay.getContext('2d');
-const off = document.createElement('canvas'), octx = off.getContext('2d');
+const off = document.createElement('canvas'), octx = off.getContext('2d', { willReadFrequently: true });
+const mot = document.createElement('canvas'), mctx = mot.getContext('2d', { willReadFrequently: true });
 
 let ssdModel = null, poseDetector = null, hqMode = false, switching = false;
-let facing = 'user';                 // ★ v0.2: 셀카 기본
-let running = false, count = 0, handFlags = 0;
-let kneeY = null, wrists = [], distStatus = '—';
-let ballAbove = false, lastCountAt = 0;
-let lastBall = null, lastBallSeen = 0;
-let handDistLog = [];                // {t, d} 공↔손목 거리 이력 (손 사용 판정)
+let voiceOn = true, motionOn = false;
+let facing = 'user';
+let running = false, count = 0, handFlags = 0, recoveryCounts = 0, motionAssists = 0;
+let kneeY = null, wrists = [];
+let body = null;              // {cx, hy, ay, h, w, expR} 포즈 기반 신체 정보
+let ballAbove = false, lastCountAt = 0, gapFlag = false;
+let lastBall = null, lastBallSeen = 0, prevSample = null, lostSaid = false;
+let handDistLog = [];
+let prevMotion = null;        // 모션보조용 이전 프레임
 let frames = 0, fps = 0, lastFpsAt = performance.now(), frameIdx = 0;
 let audioCtx = null;
 const PERSONAL_BEST = 31, NEW_USER = false;
 
 const clamp = (v,a,b)=>Math.min(Math.max(v,a),b);
-function tone(f,d){ try{
+function tone(f,d,g){ try{
   audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
-  o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
-  g.gain.setValueAtTime(.15, audioCtx.currentTime);
-  g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + d);
+  const o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+  o.frequency.value = f; o.connect(gn); gn.connect(audioCtx.destination);
+  gn.gain.setValueAtTime(g||.25, audioCtx.currentTime);
+  gn.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + d);
   o.start(); o.stop(audioCtx.currentTime + d);
 }catch(e){} }
-const beep = ()=>tone(880,.09), buzz = ()=>tone(170,.2);
+const beep = ()=>tone(880,.1), buzz = ()=>tone(170,.22,.3);
+function speak(text){
+  if(!voiceOn) return;
+  try{
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR'; u.rate = 1.25;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function flash(kind){
+  const f = $('flash');
+  f.className = kind;                    // 'g' | 'r'
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ f.className = ''; }));
+}
 
 function setMirror(){
   const on = (facing === 'user');
@@ -131,7 +165,7 @@ async function loadModels(){
     $('loading').style.display = 'none';
     requestAnimationFrame(loop);
   }catch(e){
-    $('loadmsg').innerHTML = '모델/카메라 로드 실패 😢<br><span style="font-weight:400;font-size:11px">크롬에서 직접 열었는지, 카메라 권한을 허용했는지 확인해 주세요.<br>(' + e.message + ')</span>';
+    $('loadmsg').innerHTML = '모델/카메라 로드 실패 😢<br><span style="font-weight:400;font-size:11px">크롬에서 직접 열었는지, 카메라 권한 허용했는지 확인.<br>(' + e.message + ')</span>';
   }
 }
 
@@ -151,28 +185,37 @@ $('btnCam').onclick = async () => {
   facing = (facing === 'user') ? 'environment' : 'user';
   try{ await startCamera(); }catch(e){ facing = 'user'; await startCamera().catch(()=>{}); }
 };
-
+$('btnVoice').onclick = () => {
+  voiceOn = !voiceOn;
+  $('btnVoice').textContent = voiceOn ? '🔊 음성 ON' : '🔇 음성 OFF';
+  $('btnVoice').classList.toggle('on', voiceOn);
+};
+$('btnMotion').onclick = () => {
+  motionOn = !motionOn;
+  $('btnMotion').textContent = motionOn ? '🌀 모션보조 ON' : '🌀 모션보조 OFF';
+  $('btnMotion').classList.toggle('on', motionOn);
+};
 $('btnHQ').onclick = async () => {
   if(switching) return;
   switching = true; hqMode = !hqMode;
-  const b = $('btnHQ');
-  b.textContent = '⏳ 전환 중…';
+  $('btnHQ').textContent = '⏳ 전환 중…';
   try{ await loadSsd(); }catch(e){ hqMode = !hqMode; }
-  b.textContent = hqMode ? '🎯 고정밀 ON' : '🎯 고정밀 OFF';
-  b.classList.toggle('on', hqMode);
+  $('btnHQ').textContent = hqMode ? '🎯 고정밀 ON' : '🎯 고정밀 OFF';
+  $('btnHQ').classList.toggle('on', hqMode);
   switching = false;
 };
 
 $('btnStart').onclick = () => {
-  count = 0; handFlags = 0; ballAbove = false; lastCountAt = 0; handDistLog = [];
+  count = 0; handFlags = 0; recoveryCounts = 0; motionAssists = 0;
+  ballAbove = false; lastCountAt = 0; handDistLog = []; gapFlag = false; prevSample = null;
   running = true;
-  tone(660,.05); // AudioContext 활성화(사용자 제스처)
+  tone(660,.06);
+  speak('도전 시작');
   $('count').textContent = '0';
-  $('countLabel').textContent = '카운팅 중';
   $('result').style.display = 'none';
   $('btnStart').style.display = 'none';
   $('btnStop').style.display = 'block';
-  say('공을 차 올리세요! 발 리프팅만 카운트됩니다');
+  say('공을 차 올리세요!');
 };
 $('btnStop').onclick = () => endSession('수동 종료');
 
@@ -183,59 +226,130 @@ function say(text, alert){
   m.classList.toggle('alert', !!alert);
   if(alert){
     clearTimeout(msgTimer);
-    msgTimer = setTimeout(()=>m.classList.remove('alert'), 1200);
+    msgTimer = setTimeout(()=>m.classList.remove('alert'), 1400);
   }
+}
+
+function addCount(kind){
+  count++;
+  $('count').textContent = count;
+  const w = $('countWrap');
+  w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
+  beep(); flash('g');
+  speak(String(count));
+  if(kind === 'recovery'){ recoveryCounts++; }
 }
 
 function endSession(reason){
   running = false;
   $('btnStart').style.display = 'block';
   $('btnStop').style.display = 'none';
-  $('countLabel').textContent = '대기 중';
   const minValid = NEW_USER ? 2 : 10;
   const isPB = count > PERSONAL_BEST;
   const flagged = handFlags >= 3;
   const valid = !flagged && (count >= minValid || isPB);
   $('resFinal').textContent = count + '개';
   const tag = $('resTag');
-  if(flagged){ tag.textContent = '무효 — 손 사용 감지 ' + handFlags + '회 🖐'; tag.className = 'tag flag'; }
-  else if(isPB){ tag.textContent = '개인 최고 경신! 🎉'; tag.className = 'tag'; }
-  else if(valid){ tag.textContent = '유효 도전 ✓'; tag.className = 'tag'; }
-  else{ tag.textContent = '무효 (기준 ' + minValid + '개)'; tag.className = 'tag invalid'; }
-  $('resSub').textContent = '종료: ' + reason + (handFlags ? ' · 손 감지 ' + handFlags + '회' : '') +
-    ' · 실서비스: 클립 저장 + 판정 메타 서버 업로드';
+  if(flagged){ tag.textContent = '무효 — 손 사용 감지 ' + handFlags + '회 🖐'; tag.className = 'tag flag'; speak('손 사용으로 무효'); }
+  else if(isPB){ tag.textContent = '개인 최고 경신! 🎉'; tag.className = 'tag'; speak('종료. ' + count + '개. 개인 최고 경신!'); }
+  else if(valid){ tag.textContent = '유효 도전 ✓'; tag.className = 'tag'; speak('종료. ' + count + '개. 유효 도전'); }
+  else{ tag.textContent = '무효 (기준 ' + minValid + '개)'; tag.className = 'tag invalid'; speak('종료. ' + count + '개'); }
+  $('resSub').textContent = '종료: ' + reason +
+    (handFlags ? ' · 손감지 ' + handFlags : '') +
+    (recoveryCounts ? ' · 복구카운트 ' + recoveryCounts : '') +
+    (motionAssists ? ' · 모션보조 ' + motionAssists : '');
   $('result').style.display = 'block';
   say('다시 도전하려면 시작을 누르세요');
 }
 
-// ── 볼 검출: ROI 우선 추적, 놓치면 전체 탐색 ──
+// ── 사각 크롭 검출 헬퍼 ──
+async function detectInRegion(rx, ry, rs, thr){
+  off.width = off.height = 320;
+  octx.drawImage(video, rx, ry, rs, rs, 0, 0, 320, 320);
+  let dets = [];
+  try{ dets = await ssdModel.detect(off, 5, thr); }catch(e){}
+  const k = rs / 320;
+  return dets.filter(d => d.class === 'sports ball').map(d => {
+    const [x,y,w,h] = d.bbox;
+    return { x: rx + (x + w/2)*k, y: ry + (y + h/2)*k, r: Math.max(w,h)/2*k, score: d.score };
+  });
+}
+function sizeOK(r){
+  if(!body || !body.expR) return true;
+  return r > body.expR * 0.35 && r < body.expR * 3.2;
+}
+
+// ── 모션보조 (실험): 마지막 공 주변 프레임차 블롭 ──
+function motionBlob(now){
+  if(!motionOn || !lastBall || now - lastBallSeen > 1500 || !body) return null;
+  const S = 96;
+  const side = clamp((body.expR||20) * 10, 200, Math.min(video.videoWidth, video.videoHeight));
+  const rx = clamp(lastBall.x - side/2, 0, video.videoWidth - side);
+  const ry = clamp(lastBall.y - side/2, 0, video.videoHeight - side);
+  mot.width = mot.height = S;
+  mctx.drawImage(video, rx, ry, side, side, 0, 0, S, S);
+  const cur = mctx.getImageData(0, 0, S, S);
+  let result = null;
+  if(prevMotion && prevMotion.rx === rx && prevMotion.ry === ry){
+    let sx=0, sy=0, n=0;
+    const a = cur.data, b = prevMotion.data;
+    for(let i=0;i<S*S;i++){
+      const j=i*4;
+      const d = Math.abs(a[j]-b[j]) + Math.abs(a[j+1]-b[j+1]) + Math.abs(a[j+2]-b[j+2]);
+      if(d > 90){ sx += i%S; sy += (i/S)|0; n++; }
+    }
+    const k = side/S, expPx = (body.expR*2)/k;   // 예상 공 지름(모션 좌표계)
+    if(n > expPx*expPx*0.25 && n < expPx*expPx*4){
+      const bx = rx + (sx/n)*k, by = ry + (sy/n)*k;
+      // 발/무릎 근처 블롭 제외(다리 움직임 오인 방지)
+      const nearLimb = [...(body.ankles||[]), ...(body.knees||[])].some(p => Math.hypot(bx-p.x, by-p.y) < body.expR*1.4);
+      if(!nearLimb && Math.hypot(bx-lastBall.x, by-lastBall.y) < body.expR*8){
+        result = { x: bx, y: by, r: lastBall.r, score: 0, src: 'motion' };
+      }
+    }
+  }
+  prevMotion = { data: cur.data.slice(), rx, ry };
+  return result;
+}
+
+// ── 볼 탐색 파이프라인: 추적ROI → 다리영역 확대 → 전체 ──
 async function detectBall(now){
   const vw = video.videoWidth, vh = video.videoHeight;
-  let dets = null, region = null;
-  const useROI = lastBall && (now - lastBallSeen < 1200) && (frameIdx % 12 !== 0);
-  if(useROI){
-    const side = clamp(lastBall.r * 8, 240, Math.min(vw, vh));
-    region = {
-      x: clamp(lastBall.x - side/2, 0, vw - side),
-      y: clamp(lastBall.y - side/2, 0, vh - side),
-      s: side
-    };
-    off.width = off.height = 320;
-    octx.drawImage(video, region.x, region.y, region.s, region.s, 0, 0, 320, 320);
-    try{ dets = await ssdModel.detect(off, 5, 0.2); }catch(e){ dets = []; }
-    if(!dets.some(d => d.class === 'sports ball')){ region = null; dets = null; } // ROI 실패 → 전체
+  let found = null, src = 'full';
+
+  // 1) 추적 ROI (직전 위치 주변 확대)
+  if(lastBall && now - lastBallSeen < 1200 && frameIdx % 14 !== 0){
+    const side = clamp(lastBall.r * 9, 240, Math.min(vw, vh));
+    const rx = clamp(lastBall.x - side/2, 0, vw - side);
+    const ry = clamp(lastBall.y - side/2, 0, vh - side);
+    const c = (await detectInRegion(rx, ry, side, 0.18)).filter(d => sizeOK(d.r));
+    if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'roi'; }
   }
-  if(!dets){
-    try{ dets = await ssdModel.detect(video, 5, 0.3); }catch(e){ dets = []; }
+  // 2) ★ 포즈 기반 다리영역 확대 탐색 (원거리 최초 포착의 핵심)
+  if(!found && body){
+    const side = clamp(Math.max(body.w * 3.2, body.h * 0.75), 260, Math.min(vw, vh));
+    const cy = (body.hy + body.ay) / 2 + body.h * 0.08;   // 무릎~발 중심 약간 아래
+    const rx = clamp(body.cx - side/2, 0, vw - side);
+    const ry = clamp(cy - side/2, 0, vh - side);
+    const c = (await detectInRegion(rx, ry, side, 0.15)).filter(d => sizeOK(d.r));
+    if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'leg'; }
   }
-  const balls = dets.filter(d => d.class === 'sports ball').sort((a,b)=>b.score-a.score);
-  if(!balls.length) return null;
-  let [x,y,w,h] = balls[0].bbox;
-  if(region){
-    const k = region.s / 320;
-    x = region.x + x*k; y = region.y + y*k; w *= k; h *= k;
+  // 3) 전체 프레임 (백업 / 주기 스캔)
+  if(!found){
+    let dets = [];
+    try{ dets = await ssdModel.detect(video, 5, 0.28); }catch(e){}
+    const c = dets.filter(d => d.class === 'sports ball')
+      .map(d => { const [x,y,w,h]=d.bbox; return {x:x+w/2, y:y+h/2, r:Math.max(w,h)/2, score:d.score}; })
+      .filter(d => sizeOK(d.r));
+    if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'full'; }
   }
-  return { x: x + w/2, y: y + h/2, r: Math.max(w,h)/2, score: balls[0].score, roi: !!region };
+  // 4) 모션보조 (실험)
+  if(!found){
+    const m = motionBlob(now);
+    if(m){ found = m; src = 'motion'; motionAssists++; }
+  }
+  if(found) found.src = src;
+  return found;
 }
 
 async function loop(){
@@ -245,7 +359,7 @@ async function loop(){
   const now = performance.now();
   if(now - lastFpsAt >= 1000){ fps = frames; frames = 0; lastFpsAt = now; }
 
-  // 포즈: 4프레임마다 (무릎선 + 손목 + 거리 가이드)
+  // 포즈: 4프레임마다
   if(frameIdx % 4 === 1 && poseDetector){
     try{
       const poses = await poseDetector.estimatePoses(video);
@@ -253,77 +367,109 @@ async function loop(){
         const kp = poses[0].keypoints;
         const pick = n => { const k = kp.find(p=>p.name===n); return (k && k.score > 0.3) ? k : null; };
         const knees = [pick('left_knee'), pick('right_knee')].filter(Boolean);
-        if(knees.length){ kneeY = knees.reduce((s,k)=>s+k.y,0) / knees.length; }
+        if(knees.length){ kneeY = knees.reduce((s,k)=>s+k.y,0)/knees.length; }
         wrists = [pick('left_wrist'), pick('right_wrist')].filter(Boolean);
         const nose = pick('nose');
+        const hips = [pick('left_hip'), pick('right_hip')].filter(Boolean);
         const ankles = [pick('left_ankle'), pick('right_ankle')].filter(Boolean);
-        if(nose && ankles.length){
-          const frac = (ankles.reduce((s,k)=>s+k.y,0)/ankles.length - nose.y) / overlay.height;
-          distStatus = frac > 0.8 ? '가까움 ↩' : (frac < 0.45 ? '멀어요 ↪' : '적정 ✓');
-        } else { distStatus = '전신 미확보'; }
+        if(nose && hips.length && ankles.length){
+          const hy = hips.reduce((s,k)=>s+k.y,0)/hips.length;
+          const ay = ankles.reduce((s,k)=>s+k.y,0)/ankles.length;
+          const cx = hips.reduce((s,k)=>s+k.x,0)/hips.length;
+          const h = ay - nose.y;
+          const xs = [...hips, ...ankles, ...knees].map(k=>k.x);
+          const w = Math.max(60, Math.max(...xs) - Math.min(...xs));
+          body = { cx, hy, ay, h, w, knees, ankles,
+                   expR: clamp(h * 0.065, 7, 90) };
+        }
       }
     }catch(e){}
   }
 
+  const gapBefore = now - lastBallSeen;
   const ball = await detectBall(now);
-  if(ball){ lastBall = ball; lastBallSeen = now; }
+  let vy = null;
+  if(ball){
+    if(gapBefore > 300) gapFlag = true;
+    if(prevSample && now - prevSample.t < 220){ vy = (ball.y - prevSample.y) / (now - prevSample.t); }
+    prevSample = { y: ball.y, t: now };
+    lastBall = ball; lastBallSeen = now; lostSaid = false;
+  }
 
-  // 공↔손목 거리 이력 (손 사용 판정용, 최근 400ms)
+  // 공↔손목 거리 이력
   if(ball && wrists.length){
     const d = Math.min(...wrists.map(w => Math.hypot(ball.x - w.x, ball.y - w.y)));
     handDistLog.push({ t: now, d });
   }
   handDistLog = handDistLog.filter(e => now - e.t < 400);
 
-  // ── 카운팅 상태기계 + 손 사용 거부 ──
+  // ── 카운팅 상태기계 ──
   if(running && ball && kneeY !== null){
     const ABOVE = ball.y < kneeY - 12;
     const BELOW = ball.y > kneeY + 12;
+    const th = Math.max(55, ball.r * 2.6);
+    const recentMin = handDistLog.length ? Math.min(...handDistLog.map(e=>e.d)) : null;
+    const handNear = recentMin !== null && recentMin < th;
+
     if(ABOVE && !ballAbove && now - lastCountAt > 250){
       ballAbove = true; lastCountAt = now;
-      const th = Math.max(55, ball.r * 2.6);
-      const recentMin = handDistLog.length ? Math.min(...handDistLog.map(e=>e.d)) : null;
-      if(recentMin !== null && recentMin < th){
-        handFlags++; buzz();
+      if(handNear){
+        handFlags++; buzz(); flash('r');
+        speak('손 사용'); say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
+        if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); return; }
+      }else{
+        addCount('normal'); gapFlag = false;
+      }
+    }
+    // ★ 복구 카운트: 아래 구간을 못 본 채(검출 공백) 위에서 상승 중으로 재발견
+    else if(ABOVE && ballAbove && gapFlag && vy !== null && vy < -0.45 && now - lastCountAt > 450){
+      lastCountAt = now; gapFlag = false;
+      if(handNear){
+        handFlags++; buzz(); flash('r');
         say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
         if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); return; }
       }else{
-        count++; beep();
-        $('count').textContent = count;
+        addCount('recovery');
       }
-    }else if(BELOW && ballAbove){
-      ballAbove = false;
     }
-  }
-  if(running && count > 0 && now - lastBallSeen > 3000){
-    endSession('공 미검출 3초 (드롭)');
+    else if(BELOW && ballAbove){ ballAbove = false; }
   }
 
-  // ── 오버레이 ──
+  if(running && !ball && now - lastBallSeen > 1200 && !lostSaid && count > 0){
+    lostSaid = true; speak('공 놓침');
+  }
+  if(running && count > 0 && now - lastBallSeen > 3500){
+    endSession('공 미검출 (드롭)');
+  }
+
+  // ── 추적 스트립 + 오버레이 ──
+  const tb = $('trackbar');
+  if(now - lastBallSeen < 350 && lastBall){
+    tb.className = (lastBall.src === 'roi' || lastBall.src === 'leg' || lastBall.src === 'motion') ? 'roi' : 'ok';
+    if(lastBall.src === 'full') tb.className = 'ok';
+  } else {
+    tb.className = 'lost';
+  }
+
   ctx.clearRect(0,0,overlay.width,overlay.height);
   if(kneeY !== null){
-    ctx.setLineDash([10,8]); ctx.strokeStyle = '#F2691D'; ctx.lineWidth = 3;
+    ctx.setLineDash([10,8]); ctx.strokeStyle = '#F2691D'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(0,kneeY); ctx.lineTo(overlay.width,kneeY); ctx.stroke();
     ctx.setLineDash([]);
   }
   if(ball){
-    ctx.strokeStyle = ballAbove ? '#B9F04A' : '#FFFFFF'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r + 4, 0, Math.PI*2); ctx.stroke();
-    if(ball.roi){ ctx.fillStyle = 'rgba(185,240,74,.9)'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('ROI', ball.x + ball.r + 8, ball.y); }
+    ctx.strokeStyle = ballAbove ? '#B9F04A' : '#FFFFFF'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r + 5, 0, Math.PI*2); ctx.stroke();
   }
-  wrists.forEach(w => {
-    ctx.fillStyle = 'rgba(245,176,144,.9)';
-    ctx.beginPath(); ctx.arc(w.x, w.y, 5, 0, Math.PI*2); ctx.fill();
-  });
-  $('stat').innerHTML =
-    'FPS ' + fps + (hqMode ? ' 🎯' : '') +
-    '<br>볼 ' + (ball ? (ball.score*100|0) + '%' + (ball.roi?' (ROI)':'') : '<span class="warn">미검출</span>') +
-    '<br>무릎 ' + (kneeY !== null ? 'OK' : '—') +
-    '<br>거리 ' + distStatus +
-    (handFlags ? '<br><span class="warn">손감지 ' + handFlags + '회</span>' : '');
+  $('stat').innerHTML = 'FPS ' + fps + (hqMode?' 🎯':'') +
+    '<br>볼 ' + (ball ? (ball.score*100|0) + '% ' + ball.src : '<span class="warn">—</span>') +
+    '<br>예상r ' + (body ? (body.expR|0) + 'px' : '—') +
+    (handFlags ? '<br><span class="warn">손감지 ' + handFlags + '</span>' : '');
+
   if(!running){
-    say(kneeY === null ? '전신이 보이게 물러서 주세요 (무릎 인식 대기)'
-      : (ball ? '준비 완료! 시작을 누르세요 (거리: ' + distStatus + ')' : '공이 화면에 보이게 해주세요'));
+    if(kneeY === null){ say('전신이 보이게 서 주세요'); }
+    else if(!ball && now - lastBallSeen > 800){ say('공을 발 앞에 두세요 (상단 스트립: 빨강=놓침)'); }
+    else { say('준비 완료! 시작을 누르세요'); }
   }
 }
 
