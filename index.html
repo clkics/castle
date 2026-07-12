@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.1</title>
+<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.2</title>
 <style>
-  :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --paper:#F4F6F1; --crown:#D9A02B; }
+  :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; }
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:-apple-system,'Noto Sans KR',sans-serif;background:#0C1A13;color:#E9EFE6;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px}
   h1{font-size:18px;font-weight:900;margin-bottom:2px}
@@ -14,40 +14,46 @@
   .stage{position:relative;width:100%;max-width:520px;aspect-ratio:3/4;background:#000;border-radius:16px;overflow:hidden;border:1.5px solid #2C4437}
   video,canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   canvas{z-index:2}
+  .mirror{transform:scaleX(-1)}
   .hud{position:absolute;z-index:3;top:10px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
   .count{font-size:64px;font-weight:900;line-height:1;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6)}
-  .count small{font-size:14px;font-weight:700;display:block;color:#B9F0CE}
+  .count small{font-size:13px;font-weight:700;display:block;color:#B9F0CE}
   .stat{font-size:10px;text-align:right;color:#B8C9BD;background:rgba(0,0,0,.35);border-radius:8px;padding:5px 8px;line-height:1.6}
-  .msg{position:absolute;z-index:3;bottom:12px;left:12px;right:12px;text-align:center;font-size:12px;font-weight:700;background:rgba(0,0,0,.45);border-radius:10px;padding:8px;pointer-events:none}
+  .stat .warn{color:#F5B090}
+  .msg{position:absolute;z-index:3;bottom:12px;left:12px;right:12px;text-align:center;font-size:12px;font-weight:700;background:rgba(0,0,0,.45);border-radius:10px;padding:8px;pointer-events:none;transition:background .2s}
+  .msg.alert{background:rgba(194,69,45,.75)}
   .controls{display:flex;gap:8px;width:100%;max-width:520px;margin-top:12px}
-  button{flex:1;padding:14px;border-radius:12px;border:none;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit}
-  #btnStart{background:var(--ball);color:#fff}
-  #btnStop{background:#fff;color:var(--ink);display:none}
-  #btnCam{flex:0 0 56px;background:#22382C;color:#fff;font-size:18px}
+  button{padding:14px 6px;border-radius:12px;border:none;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit}
+  #btnStart{flex:1;background:var(--ball);color:#fff}
+  #btnStop{flex:1;background:#fff;color:var(--ink);display:none}
+  #btnCam{flex:0 0 52px;background:#22382C;color:#fff;font-size:17px}
+  #btnHQ{flex:0 0 92px;background:#22382C;color:#fff;font-size:12px}
+  #btnHQ.on{background:var(--crown);color:#1d1503}
   button:disabled{opacity:.4}
   .result{display:none;width:100%;max-width:520px;margin-top:12px;background:#132920;border:1.5px solid var(--grass);border-radius:14px;padding:14px;text-align:center}
   .result .big{font-size:34px;font-weight:900;color:#B9F0CE}
   .result .tag{display:inline-block;margin-top:6px;font-size:12px;font-weight:900;padding:4px 12px;border-radius:99px;background:var(--grass);color:#fff}
   .result .tag.invalid{background:#5a5f5b}
+  .result .tag.flag{background:#C2452D}
   .tips{width:100%;max-width:520px;margin-top:12px;font-size:11px;color:#9FB3A5;line-height:1.7;background:#10231A;border-radius:12px;padding:12px}
   .tips b{color:#DCE7DE}
-  #loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0C1A13;font-size:13px;font-weight:700;gap:10px}
+  #loading{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0C1A13;font-size:13px;font-weight:700;gap:10px;text-align:center;padding:20px}
   .spin{width:26px;height:26px;border-radius:50%;border:3px solid #2C4437;border-top-color:var(--ball);animation:sp 1s linear infinite}
   @keyframes sp{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
-<h1>풋볼캐슬 <span>리프팅 카운터</span> 기술검증 v0.1</h1>
-<p class="note">온디바이스 AI가 실시간으로 무릎 기준선을 잡고, 공이 선 위로 올라올 때마다 카운트합니다.<br>
-<b>⚠ 이 파일은 다운로드 후 크롬 브라우저에서 직접 열어야 카메라가 작동합니다</b> (Claude 미리보기에서는 카메라 차단).</p>
+<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.2</h1>
+<p class="note">v0.2: 셀카 기본 + 카운트 효과음 · 🖐 손 사용 감지(손목 근접 거부) · 원거리 인식 개선(ROI 추적 + 고정밀 모드)<br>
+<b>⚠ 다운로드 후 크롬에서 직접 열어야 카메라가 작동합니다.</b></p>
 
 <div class="stage">
-  <div id="loading"><div class="spin"></div><span id="loadmsg">AI 모델 불러오는 중… (첫 실행 시 10~20초)</span></div>
-  <video id="video" playsinline muted></video>
-  <canvas id="overlay"></canvas>
+  <div id="loading"><div class="spin"></div><span id="loadmsg">AI 모델 불러오는 중… (첫 실행 10~20초)</span></div>
+  <video id="video" class="mirror" playsinline muted></video>
+  <canvas id="overlay" class="mirror"></canvas>
   <div class="hud">
     <div class="count"><span id="count">0</span><small id="countLabel">대기 중</small></div>
-    <div class="stat" id="stat">FPS —<br>볼 —<br>무릎 —</div>
+    <div class="stat" id="stat">FPS —<br>볼 —<br>무릎 —<br>거리 —</div>
   </div>
   <div class="msg" id="msg">시작을 누르고, 전신과 공이 화면에 들어오게 서 주세요</div>
 </div>
@@ -55,6 +61,7 @@
 <div class="controls">
   <button id="btnStart">▶ 도전 시작</button>
   <button id="btnStop">■ 종료</button>
+  <button id="btnHQ" title="정확도 우선 모델로 전환 (조금 느려짐)">🎯 고정밀 OFF</button>
   <button id="btnCam" title="카메라 전환">🔄</button>
 </div>
 
@@ -65,9 +72,9 @@
 </div>
 
 <div class="tips">
-  <b>정확도를 높이는 세팅</b> — ① 폰/노트북을 바닥~허리 높이에 고정하고 3~4걸음 물러서기 ② 전신 + 공의 최고점이 화면 안에 ③ 밝은 곳, 공과 대비되는 배경 ④ 공은 단색(흰/주황)이 인식 잘 됨.<br>
-  <b>판정 로직</b> — MoveNet(포즈)로 무릎 y좌표 → 주황 점선(기준선) / COCO-SSD로 sports ball 추적 → 공이 기준선 <b>아래→위로 넘어갈 때 +1</b> (250ms 디바운스). 공이 3초간 바닥에 머물면 자동 종료.<br>
-  <b>이 검증의 목적</b> — 실서비스는 모바일 네이티브(TFLite)로 옮기지만, 카운팅 로직과 정확도 한계를 오늘 이 파일로 먼저 확인합니다.
+  <b>v0.2 판정 로직</b> — 카운트 조건: 공이 무릎 기준선 아래→위 통과(디바운스 250ms) <b>그리고</b> 직전 0.4초간 공이 손목에서 충분히 떨어져 있었을 것. 손목 근처에서 움직인 공은 <b>🖐 손 사용으로 거부</b>되고, 한 세션에서 3회 이상 감지되면 도전 전체가 무효 처리됩니다.<br>
+  <b>거리 가이드</b> — 우측 상단 '거리'가 <b>적정</b>일 때가 최적(화면 세로의 45~80%에 전신). 멀어지면 공이 작아져 인식률이 떨어지므로, 공을 놓치면 마지막 위치 주변을 확대 탐색(ROI)해 재포착합니다. 그래도 부족하면 🎯 고정밀 모드를 켜세요(더 정확, 조금 느림).<br>
+  <b>MVP 규칙</b> — 발 리프팅만 카운트합니다(허벅지·헤딩은 기준선 위에서만 움직여 카운트되지 않음 — 의도된 동작).
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -77,24 +84,44 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const video = $('video'), overlay = $('overlay'), ctx = overlay.getContext('2d');
+const off = document.createElement('canvas'), octx = off.getContext('2d');
 
-let ssdModel = null, poseDetector = null;
-let facing = 'environment';          // 후면 우선, 🔄로 전환
-let running = false;                 // 카운팅 세션 중인가
-let count = 0;
-let kneeY = null;                    // 무릎 기준선 (캔버스 좌표)
-let ballAbove = false;               // 공이 기준선 위에 있는 상태
-let lastCountAt = 0;                 // 디바운스
-let lastBallSeen = 0, lastBallLow = 0;
-let frames = 0, fps = 0, lastFpsAt = performance.now();
-let poseTick = 0;
-const PERSONAL_BEST = 31;            // 데모용 개인 최고 (실서비스: 서버 값)
-const NEW_USER = false;              // 신규 30일 특례 시 true → 2개부터 유효
+let ssdModel = null, poseDetector = null, hqMode = false, switching = false;
+let facing = 'user';                 // ★ v0.2: 셀카 기본
+let running = false, count = 0, handFlags = 0;
+let kneeY = null, wrists = [], distStatus = '—';
+let ballAbove = false, lastCountAt = 0;
+let lastBall = null, lastBallSeen = 0;
+let handDistLog = [];                // {t, d} 공↔손목 거리 이력 (손 사용 판정)
+let frames = 0, fps = 0, lastFpsAt = performance.now(), frameIdx = 0;
+let audioCtx = null;
+const PERSONAL_BEST = 31, NEW_USER = false;
+
+const clamp = (v,a,b)=>Math.min(Math.max(v,a),b);
+function tone(f,d){ try{
+  audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+  g.gain.setValueAtTime(.15, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + d);
+  o.start(); o.stop(audioCtx.currentTime + d);
+}catch(e){} }
+const beep = ()=>tone(880,.09), buzz = ()=>tone(170,.2);
+
+function setMirror(){
+  const on = (facing === 'user');
+  video.classList.toggle('mirror', on);
+  overlay.classList.toggle('mirror', on);
+}
+
+async function loadSsd(){
+  ssdModel = await cocoSsd.load({ base: hqMode ? 'mobilenet_v2' : 'lite_mobilenet_v2' });
+}
 
 async function loadModels(){
   try{
     $('loadmsg').textContent = 'AI 모델 불러오는 중… (1/2 볼 검출)';
-    ssdModel = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
+    await loadSsd();
     $('loadmsg').textContent = 'AI 모델 불러오는 중… (2/2 포즈 추정)';
     poseDetector = await poseDetection.createDetector(
       poseDetection.SupportedModels.MoveNet,
@@ -104,39 +131,61 @@ async function loadModels(){
     $('loading').style.display = 'none';
     requestAnimationFrame(loop);
   }catch(e){
-    $('loadmsg').innerHTML = '모델/카메라 로드 실패 😢<br><span style="font-weight:400;font-size:11px">' +
-      '이 파일을 크롬에서 직접 열었는지, 카메라 권한을 허용했는지 확인해 주세요.<br>(' + e.message + ')</span>';
+    $('loadmsg').innerHTML = '모델/카메라 로드 실패 😢<br><span style="font-weight:400;font-size:11px">크롬에서 직접 열었는지, 카메라 권한을 허용했는지 확인해 주세요.<br>(' + e.message + ')</span>';
   }
 }
 
 async function startCamera(){
   if(video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); }
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: facing, width: {ideal: 640}, height: {ideal: 480} }, audio: false
+    video: { facingMode: facing, width: {ideal: 1280}, height: {ideal: 720} }, audio: false
   });
   video.srcObject = stream;
   await new Promise(res => { video.onloadedmetadata = res; });
   await video.play();
   overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+  setMirror();
 }
 
 $('btnCam').onclick = async () => {
-  facing = (facing === 'environment') ? 'user' : 'environment';
-  try{ await startCamera(); }catch(e){ $('msg').textContent = '카메라 전환 실패: ' + e.message; }
+  facing = (facing === 'user') ? 'environment' : 'user';
+  try{ await startCamera(); }catch(e){ facing = 'user'; await startCamera().catch(()=>{}); }
+};
+
+$('btnHQ').onclick = async () => {
+  if(switching) return;
+  switching = true; hqMode = !hqMode;
+  const b = $('btnHQ');
+  b.textContent = '⏳ 전환 중…';
+  try{ await loadSsd(); }catch(e){ hqMode = !hqMode; }
+  b.textContent = hqMode ? '🎯 고정밀 ON' : '🎯 고정밀 OFF';
+  b.classList.toggle('on', hqMode);
+  switching = false;
 };
 
 $('btnStart').onclick = () => {
-  count = 0; ballAbove = false; lastCountAt = 0; lastBallLow = performance.now();
+  count = 0; handFlags = 0; ballAbove = false; lastCountAt = 0; handDistLog = [];
   running = true;
+  tone(660,.05); // AudioContext 활성화(사용자 제스처)
   $('count').textContent = '0';
   $('countLabel').textContent = '카운팅 중';
   $('result').style.display = 'none';
   $('btnStart').style.display = 'none';
   $('btnStop').style.display = 'block';
-  $('msg').textContent = '공을 차 올리세요! 기준선(주황) 위로 넘어갈 때마다 +1';
+  say('공을 차 올리세요! 발 리프팅만 카운트됩니다');
 };
-
 $('btnStop').onclick = () => endSession('수동 종료');
+
+let msgTimer = null;
+function say(text, alert){
+  const m = $('msg');
+  m.textContent = text;
+  m.classList.toggle('alert', !!alert);
+  if(alert){
+    clearTimeout(msgTimer);
+    msgTimer = setTimeout(()=>m.classList.remove('alert'), 1200);
+  }
+}
 
 function endSession(reason){
   running = false;
@@ -145,91 +194,136 @@ function endSession(reason){
   $('countLabel').textContent = '대기 중';
   const minValid = NEW_USER ? 2 : 10;
   const isPB = count > PERSONAL_BEST;
-  const valid = count >= minValid || isPB;
+  const flagged = handFlags >= 3;
+  const valid = !flagged && (count >= minValid || isPB);
   $('resFinal').textContent = count + '개';
   const tag = $('resTag');
-  tag.textContent = isPB ? '개인 최고 경신! 🎉' : (valid ? '유효 도전 ✓' : '무효 (기준 ' + minValid + '개)');
-  tag.className = 'tag' + (valid ? '' : ' invalid');
-  $('resSub').textContent = '종료 사유: ' + reason + ' · 실서비스에서는 이 순간 클립 저장 + 구장 보드 반영';
+  if(flagged){ tag.textContent = '무효 — 손 사용 감지 ' + handFlags + '회 🖐'; tag.className = 'tag flag'; }
+  else if(isPB){ tag.textContent = '개인 최고 경신! 🎉'; tag.className = 'tag'; }
+  else if(valid){ tag.textContent = '유효 도전 ✓'; tag.className = 'tag'; }
+  else{ tag.textContent = '무효 (기준 ' + minValid + '개)'; tag.className = 'tag invalid'; }
+  $('resSub').textContent = '종료: ' + reason + (handFlags ? ' · 손 감지 ' + handFlags + '회' : '') +
+    ' · 실서비스: 클립 저장 + 판정 메타 서버 업로드';
   $('result').style.display = 'block';
-  $('msg').textContent = '다시 도전하려면 시작을 누르세요';
+  say('다시 도전하려면 시작을 누르세요');
+}
+
+// ── 볼 검출: ROI 우선 추적, 놓치면 전체 탐색 ──
+async function detectBall(now){
+  const vw = video.videoWidth, vh = video.videoHeight;
+  let dets = null, region = null;
+  const useROI = lastBall && (now - lastBallSeen < 1200) && (frameIdx % 12 !== 0);
+  if(useROI){
+    const side = clamp(lastBall.r * 8, 240, Math.min(vw, vh));
+    region = {
+      x: clamp(lastBall.x - side/2, 0, vw - side),
+      y: clamp(lastBall.y - side/2, 0, vh - side),
+      s: side
+    };
+    off.width = off.height = 320;
+    octx.drawImage(video, region.x, region.y, region.s, region.s, 0, 0, 320, 320);
+    try{ dets = await ssdModel.detect(off, 5, 0.2); }catch(e){ dets = []; }
+    if(!dets.some(d => d.class === 'sports ball')){ region = null; dets = null; } // ROI 실패 → 전체
+  }
+  if(!dets){
+    try{ dets = await ssdModel.detect(video, 5, 0.3); }catch(e){ dets = []; }
+  }
+  const balls = dets.filter(d => d.class === 'sports ball').sort((a,b)=>b.score-a.score);
+  if(!balls.length) return null;
+  let [x,y,w,h] = balls[0].bbox;
+  if(region){
+    const k = region.s / 320;
+    x = region.x + x*k; y = region.y + y*k; w *= k; h *= k;
+  }
+  return { x: x + w/2, y: y + h/2, r: Math.max(w,h)/2, score: balls[0].score, roi: !!region };
 }
 
 async function loop(){
   requestAnimationFrame(loop);
-  if(!video.videoWidth) return;
-
-  // FPS
-  frames++;
+  if(!video.videoWidth || switching) return;
+  frameIdx++; frames++;
   const now = performance.now();
   if(now - lastFpsAt >= 1000){ fps = frames; frames = 0; lastFpsAt = now; }
 
-  // 포즈는 4프레임마다 (무릎은 천천히 움직임), 볼은 매 프레임
-  poseTick++;
-  if(poseTick % 4 === 1 && poseDetector){
+  // 포즈: 4프레임마다 (무릎선 + 손목 + 거리 가이드)
+  if(frameIdx % 4 === 1 && poseDetector){
     try{
       const poses = await poseDetector.estimatePoses(video);
       if(poses[0]){
         const kp = poses[0].keypoints;
-        const lk = kp.find(k => k.name === 'left_knee');
-        const rk = kp.find(k => k.name === 'right_knee');
-        const good = [lk, rk].filter(k => k && k.score > 0.3);
-        if(good.length){ kneeY = good.reduce((s,k)=>s+k.y,0) / good.length; }
+        const pick = n => { const k = kp.find(p=>p.name===n); return (k && k.score > 0.3) ? k : null; };
+        const knees = [pick('left_knee'), pick('right_knee')].filter(Boolean);
+        if(knees.length){ kneeY = knees.reduce((s,k)=>s+k.y,0) / knees.length; }
+        wrists = [pick('left_wrist'), pick('right_wrist')].filter(Boolean);
+        const nose = pick('nose');
+        const ankles = [pick('left_ankle'), pick('right_ankle')].filter(Boolean);
+        if(nose && ankles.length){
+          const frac = (ankles.reduce((s,k)=>s+k.y,0)/ankles.length - nose.y) / overlay.height;
+          distStatus = frac > 0.8 ? '가까움 ↩' : (frac < 0.45 ? '멀어요 ↪' : '적정 ✓');
+        } else { distStatus = '전신 미확보'; }
       }
-    }catch(e){/* 프레임 스킵 */}
+    }catch(e){}
   }
 
-  let ball = null;
-  if(ssdModel){
-    try{
-      const dets = await ssdModel.detect(video, 5, 0.35);
-      const balls = dets.filter(d => d.class === 'sports ball');
-      if(balls.length){
-        balls.sort((a,b)=>b.score-a.score);
-        const [x,y,w,h] = balls[0].bbox;
-        ball = { x: x + w/2, y: y + h/2, r: Math.max(w,h)/2, score: balls[0].score };
-        lastBallSeen = now;
-      }
-    }catch(e){/* 프레임 스킵 */}
-  }
+  const ball = await detectBall(now);
+  if(ball){ lastBall = ball; lastBallSeen = now; }
 
-  // ── 카운팅 상태기계: 히스테리시스 + 디바운스 ──
+  // 공↔손목 거리 이력 (손 사용 판정용, 최근 400ms)
+  if(ball && wrists.length){
+    const d = Math.min(...wrists.map(w => Math.hypot(ball.x - w.x, ball.y - w.y)));
+    handDistLog.push({ t: now, d });
+  }
+  handDistLog = handDistLog.filter(e => now - e.t < 400);
+
+  // ── 카운팅 상태기계 + 손 사용 거부 ──
   if(running && ball && kneeY !== null){
-    const ABOVE = ball.y < kneeY - 12;   // 확실히 위
-    const BELOW = ball.y > kneeY + 12;   // 확실히 아래
+    const ABOVE = ball.y < kneeY - 12;
+    const BELOW = ball.y > kneeY + 12;
     if(ABOVE && !ballAbove && now - lastCountAt > 250){
       ballAbove = true; lastCountAt = now;
-      count++; $('count').textContent = count;
+      const th = Math.max(55, ball.r * 2.6);
+      const recentMin = handDistLog.length ? Math.min(...handDistLog.map(e=>e.d)) : null;
+      if(recentMin !== null && recentMin < th){
+        handFlags++; buzz();
+        say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
+        if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); return; }
+      }else{
+        count++; beep();
+        $('count').textContent = count;
+      }
     }else if(BELOW && ballAbove){
       ballAbove = false;
     }
-    if(BELOW){ lastBallLow = now; }
   }
   if(running && count > 0 && now - lastBallSeen > 3000){
     endSession('공 미검출 3초 (드롭)');
   }
 
-  // ── 오버레이 렌더 ──
+  // ── 오버레이 ──
   ctx.clearRect(0,0,overlay.width,overlay.height);
   if(kneeY !== null){
-    ctx.setLineDash([10,8]);
-    ctx.strokeStyle = '#F2691D'; ctx.lineWidth = 3;
+    ctx.setLineDash([10,8]); ctx.strokeStyle = '#F2691D'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0,kneeY); ctx.lineTo(overlay.width,kneeY); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#F2691D'; ctx.font = 'bold 13px sans-serif';
-    ctx.fillText('무릎 기준선', 8, kneeY - 8);
   }
   if(ball){
     ctx.strokeStyle = ballAbove ? '#B9F04A' : '#FFFFFF'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r + 4, 0, Math.PI*2); ctx.stroke();
+    if(ball.roi){ ctx.fillStyle = 'rgba(185,240,74,.9)'; ctx.font = 'bold 11px sans-serif'; ctx.fillText('ROI', ball.x + ball.r + 8, ball.y); }
   }
-  $('stat').innerHTML = 'FPS ' + fps +
-    '<br>볼 ' + (ball ? (ball.score*100|0) + '%' : '<span style="color:#e08a7a">미검출</span>') +
-    '<br>무릎 ' + (kneeY !== null ? 'OK' : '—');
+  wrists.forEach(w => {
+    ctx.fillStyle = 'rgba(245,176,144,.9)';
+    ctx.beginPath(); ctx.arc(w.x, w.y, 5, 0, Math.PI*2); ctx.fill();
+  });
+  $('stat').innerHTML =
+    'FPS ' + fps + (hqMode ? ' 🎯' : '') +
+    '<br>볼 ' + (ball ? (ball.score*100|0) + '%' + (ball.roi?' (ROI)':'') : '<span class="warn">미검출</span>') +
+    '<br>무릎 ' + (kneeY !== null ? 'OK' : '—') +
+    '<br>거리 ' + distStatus +
+    (handFlags ? '<br><span class="warn">손감지 ' + handFlags + '회</span>' : '');
   if(!running){
-    $('msg').textContent = (kneeY === null)
-      ? '전신이 보이게 물러서 주세요 (무릎 인식 대기)'
-      : (ball ? '준비 완료! 시작을 누르세요' : '공이 화면에 보이게 해주세요');
+    say(kneeY === null ? '전신이 보이게 물러서 주세요 (무릎 인식 대기)'
+      : (ball ? '준비 완료! 시작을 누르세요 (거리: ' + distStatus + ')' : '공이 화면에 보이게 해주세요'));
   }
 }
 
