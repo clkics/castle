@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.5</title>
+<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.6</title>
 <style>
   :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; --ok:#3DDC84; --bad:#FF5A47; }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -48,8 +48,8 @@
 </style>
 </head>
 <body>
-<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.5</h1>
-<p class="note">v0.5: 실영상 2편(총 52초, 정답 라벨 포함)으로 검증 — <b>바닥 튀김 자동 감지</b>(카운트 차단 + 공이 땅에 닿으면 도전 종료), 손사용 오탐 제거, 카운팅률 개선, 등 돌아도 카운트 유지.<br>
+<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.6</h1>
+<p class="note">v0.6: <b>✋ 양손을 머리 위로 올리면 3·2·1 자동 시작</b>(폰까지 갈 필요 없음) · <b>가로 화면 지원</b>(폰을 눕히면 자동 전환 — 옆으로 움직여도 앵글 유지) · 바닥 종료 안정화(카운트 0에서도 작동).<br>
 <b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요.</p>
 
 <div class="stage">
@@ -83,7 +83,8 @@
 <div class="tips">
   <b>v0.5 판정 엔진 (실영상 2편 검증)</b> — 터치 = 궤적의 하강→상승 반전 + ① 접지 발목보다 충분히 위(<b>바닥 튀김이면 카운트 대신 도전 종료</b>) ② 상체 중간선 아래 ③ 낙하 신장의 7%↑ ④ 가속 낙하 + 급반전(발로 찬 공의 물리) ⑤ 반전 체류 0.33초 이내(잡았다 던지면 배제) ⑥ 반등 속도 확인.<br>
   <b>v0.4 대비</b> — 손목 부착률 판정 폐기(정상 리프팅 손사용 오탐 제거) · 바닥 튀김/공 정지 감지로 도전 자동 종료 · 컨택 속도 소실 시 구제 경로 추가(카운팅률↑) · 얼굴이 안 보여도(등 돌아도) 어깨/골반으로 신체 기준 유지.<br>
-  <b>화면 확인</b> — 카운트 순간 터치 지점에 초록 링 표시 + 화면 플래시 + 음성. 상단 스트립: <b style="color:#3DDC84">초록=추적</b> · <b style="color:#D9A02B">노랑=확대추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. <b>골반과 발목이 보여야 카운트됩니다.</b>
+  <b>화면 확인</b> — 카운트 순간 터치 지점에 초록 링 표시 + 화면 플래시 + 음성. 상단 스트립: <b style="color:#3DDC84">초록=추적</b> · <b style="color:#D9A02B">노랑=확대추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. <b>골반과 발목이 보여야 카운트됩니다.</b><br>
+  <b>자동 시작</b> — ✋ 양손을 머리 위로 0.6초 올리면 "셋·둘·하나" 후 자동 시작(종료 후 재도전도 동일). <b>가로 촬영</b> — 폰을 눕히면 화면이 자동 전환됩니다. 좌우 이동이 많은 초보는 가로 권장(이동 여유 ~3배). 단 같은 전신 구도 기준 인물이 작아져 공 인식은 다소 불리 — 가능하면 고정밀 모드를 켜세요.
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -99,7 +100,8 @@ const mot = document.createElement('canvas'), mctx = mot.getContext('2d', { will
 let ssdModel = null, poseDetector = null, hqMode = false, switching = false;
 let voiceOn = true, motionOn = false, facing = 'user';
 let running = false, count = 0, motionAssists = 0;
-let wrists = [], body = null;          // body: {cx, hy, ay, h, w, knees, ankles, expR}
+let wrists = [], body = null, noseY = null;
+let handsUpSince = 0, countdownStep = -1, countdownAt = 0, gestureCoolUntil = 0;          // body: {cx, hy, ay, h, w, knees, ankles, expR}
 let lastBall = null, lastBallSeen = 0, lostSaid = false;
 let prevMotion = null;
 let frames = 0, fps = 0, lastFpsAt = performance.now(), frameIdx = 0;
@@ -174,8 +176,13 @@ async function startCamera(){
   await new Promise(res => { video.onloadedmetadata = res; });
   await video.play();
   overlay.width = video.videoWidth; overlay.height = video.videoHeight;
+  document.querySelector('.stage').style.aspectRatio = video.videoWidth + ' / ' + video.videoHeight;
   setMirror();
 }
+let rotTimer = null;
+function onRotate(){ clearTimeout(rotTimer); rotTimer = setTimeout(()=>{ startCamera().catch(()=>{}); }, 400); }
+if(screen.orientation && screen.orientation.addEventListener){ screen.orientation.addEventListener('change', onRotate); }
+window.addEventListener('orientationchange', onRotate);
 $('btnCam').onclick = async () => {
   facing = (facing === 'user') ? 'environment' : 'user';
   try{ await startCamera(); }catch(e){ facing = 'user'; await startCamera().catch(()=>{}); }
@@ -207,7 +214,7 @@ function resetJudge(){
   groundedSince = 0; lastTouchMark = null;
 }
 
-$('btnStart').onclick = () => {
+function startSession(){
   count = 0; motionAssists = 0; lastCountAt = 0;
   resetJudge();
   running = true;
@@ -218,7 +225,8 @@ $('btnStart').onclick = () => {
   $('btnStart').style.display = 'none';
   $('btnStop').style.display = 'block';
   say('공을 차 올리세요!');
-};
+}
+$('btnStart').onclick = startSession;
 $('btnStop').onclick = () => endSession('수동 종료');
 
 let msgTimer = null;
@@ -242,6 +250,8 @@ function addCount(px, py){
 }
 function endSession(reason){
   running = false;
+  gestureCoolUntil = performance.now() + 2000;
+  countdownStep = -1; handsUpSince = 0;
   $('btnStart').style.display = 'block';
   $('btnStop').style.display = 'none';
   const minValid = NEW_USER ? 2 : 10;
@@ -359,10 +369,10 @@ function judge(now, ball){
 
   // 지면 정지 감지: 공이 접지선 근처에 1.2초+ 머무르면 종료
   if(plY !== null){
-    const nearGround = ball.y > plY - 1.8 * body.expR;
+    const nearGround = ball.y > plY - 2.0 * body.expR;
     if(nearGround){
       if(!groundedSince) groundedSince = now;
-      else if(now - groundedSince > 1200 && count > 0){ endSession('바닥 터치'); return; }
+      else if(now - groundedSince > (count > 0 ? 1200 : 2500)){ endSession('바닥 터치'); return; }
     } else groundedSince = 0;
   }
 
@@ -377,7 +387,7 @@ function judge(now, ball){
         }
       }
       if(vo !== null && vo > pend.need){
-        if(pend.t0 - lastCountAt > 280){
+        if(pend.t0 - lastCountAt > 240){
           addCount(pend.x, pend.y0);
           lastCountAt = pend.t0;
         }
@@ -404,7 +414,7 @@ function judge(now, ball){
       const fall = extMax - extMin;
       const gndRel = plY !== null ? (extMax - plY) / body.expR : -99;
       const turnaround = now - extMaxT;
-      if(gndRel >= -1.8 && fall > 0.07 * bodyH){
+      if(gndRel >= -2.0 && fall > 0.04 * bodyH){
         // 바닥 튀김: 카운트 금지 + 도전 종료(시작 전이면 경고만)
         if(count > 0){ endSession('바닥 터치'); return; }
         else { say('공이 바닥에 닿았어요 — 다시 차 올리세요!', true); buzz(); }
@@ -444,6 +454,7 @@ async function loop(){
         const pick = n => { const k = kp.find(p=>p.name===n); return (k && k.score > 0.3) ? k : null; };
         wrists = [pick('left_wrist'), pick('right_wrist')].filter(Boolean);
         const nose = pick('nose');
+        noseY = nose ? nose.y : null;
         const shs = [pick('left_shoulder'), pick('right_shoulder')].filter(Boolean);
         const hips = [pick('left_hip'), pick('right_hip')].filter(Boolean);
         const ankles = [pick('left_ankle'), pick('right_ankle')].filter(Boolean);
@@ -499,7 +510,7 @@ async function loop(){
     ctx.beginPath(); ctx.moveTo(0,gateY); ctx.lineTo(overlay.width,gateY); ctx.stroke();
     const plY = medianPlanted();
     if(plY !== null){
-      const gY = plY - 1.8 * body.expR;      // 지면 판정선(이 아래 반전 = 바닥 튀김)
+      const gY = plY - 2.0 * body.expR;      // 지면 판정선(이 아래 반전 = 바닥 튀김)
       ctx.setLineDash([4,6]); ctx.strokeStyle = '#FF5A47'; ctx.lineWidth = 3;
       ctx.beginPath(); ctx.moveTo(0,gY); ctx.lineTo(overlay.width,gY); ctx.stroke();
     }
@@ -518,9 +529,37 @@ async function loop(){
     '<br>' + (jstate||'—');
 
   if(!running){
-    if(!body){ say('골반과 발이 보이게 서 주세요'); }
-    else if(!ball && now - lastBallSeen > 800){ say('공을 발 앞에 두세요 (상단 스트립: 빨강=놓침)'); }
-    else { say('준비 완료! 시작을 누르세요'); }
+    // ✋ 양손 머리 위 0.6초 → 3·2·1 자동 시작
+    if(countdownStep >= 0){
+      const remain = 3 - Math.floor((now - countdownAt) / 1000);
+      if(now - countdownAt >= 3000){
+        countdownStep = -1; handsUpSince = 0;
+        startSession();
+      } else if(remain !== countdownStep && remain >= 1){
+        countdownStep = remain;
+        $('count').textContent = String(remain);
+        const w = $('countWrap'); w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
+        speak(remain === 2 ? '둘' : '하나'); tone(660,.08);
+        say('곧 시작! 공을 준비하세요');
+      }
+    } else if(body && now > gestureCoolUntil){
+      const up = wrists.length >= 2 && noseY !== null && wrists.every(w => w.y < noseY);
+      if(up){
+        if(!handsUpSince) handsUpSince = now;
+        else if(now - handsUpSince > 600){
+          countdownStep = 3; countdownAt = now;
+          $('count').textContent = '3';
+          const w = $('countWrap'); w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
+          speak('셋'); tone(660,.08);
+          say('곧 시작! 공을 준비하세요');
+        }
+      } else handsUpSince = 0;
+    }
+    if(countdownStep < 0){
+      if(!body){ say('골반과 발이 보이게 서 주세요'); }
+      else if(!ball && now - lastBallSeen > 800){ say('공을 발 앞에 두세요 (상단 스트립: 빨강=놓침)'); }
+      else { say('준비 완료! ✋ 양손을 머리 위로 올리면 3초 후 시작'); }
+    }
   } else if(!body){
     say('골반·발이 보여야 카운트돼요 — 조금 뒤로!', true);
   }
