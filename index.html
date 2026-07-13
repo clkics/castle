@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.4</title>
+<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.5</title>
 <style>
   :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; --ok:#3DDC84; --bad:#FF5A47; }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -48,9 +48,9 @@
 </style>
 </head>
 <body>
-<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.4.1</h1>
-<p class="note">v0.4: 판정 엔진 교체 — <b>궤적 반전 기반</b>(무릎선 크로싱 폐기). 실제 리프팅 영상으로 검증 완료(3터치 3카운트 · 운반 오탐 0 · 손바운스 치팅 차단).<br>
-공을 들고 이동해도 아무 일도 일어나지 않습니다. <b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요.</p>
+<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.5</h1>
+<p class="note">v0.5: 실영상 2편(총 52초, 정답 라벨 포함)으로 검증 — <b>바닥 튀김 자동 감지</b>(카운트 차단 + 공이 땅에 닿으면 도전 종료), 손사용 오탐 제거, 카운팅률 개선, 등 돌아도 카운트 유지.<br>
+<b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요.</p>
 
 <div class="stage">
   <div id="loading"><div class="spin"></div><span id="loadmsg">AI 모델 불러오는 중… (첫 실행 10~20초)</span></div>
@@ -81,9 +81,9 @@
 </div>
 
 <div class="tips">
-  <b>v0.4 판정 엔진 (실영상 검증)</b> — 터치 = 공 궤적의 <b>하강→상승 반전</b>. 조건: ① 반전 지점이 골반 아래 구간 ② 낙하 거리 신장의 7%↑(저공 리프팅 대응) ③ <b>반전 직전까지 가속 낙하 + 급반전</b>(발로 찬 공의 물리 특성 — 손에 든 공은 반전 전에 감속하므로 자동 배제) ④ 최근 궤적이 손목에 지속적으로 붙어있으면(부착률 90%↑) 카운트 대신 손사용 플래그.<br>
-  <b>바뀐 점</b> — 무릎선 크로싱 규칙 폐기(발을 들어 허벅지 높이에서 차는 스타일도 카운트됨). 순간 손목근접 판정 폐지(공 들고 이동 시 오탐 제거).<br>
-  <b>원거리 확인</b> — 상단 스트립: <b style="color:#3DDC84">초록=추적</b> · <b style="color:#D9A02B">노랑=확대추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. 카운트는 음성으로 읽어줍니다. <b>전신(머리~발)이 보여야 카운트됩니다.</b>
+  <b>v0.5 판정 엔진 (실영상 2편 검증)</b> — 터치 = 궤적의 하강→상승 반전 + ① 접지 발목보다 충분히 위(<b>바닥 튀김이면 카운트 대신 도전 종료</b>) ② 상체 중간선 아래 ③ 낙하 신장의 7%↑ ④ 가속 낙하 + 급반전(발로 찬 공의 물리) ⑤ 반전 체류 0.33초 이내(잡았다 던지면 배제) ⑥ 반등 속도 확인.<br>
+  <b>v0.4 대비</b> — 손목 부착률 판정 폐기(정상 리프팅 손사용 오탐 제거) · 바닥 튀김/공 정지 감지로 도전 자동 종료 · 컨택 속도 소실 시 구제 경로 추가(카운팅률↑) · 얼굴이 안 보여도(등 돌아도) 어깨/골반으로 신체 기준 유지.<br>
+  <b>화면 확인</b> — 카운트 순간 터치 지점에 초록 링 표시 + 화면 플래시 + 음성. 상단 스트립: <b style="color:#3DDC84">초록=추적</b> · <b style="color:#D9A02B">노랑=확대추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. <b>골반과 발목이 보여야 카운트됩니다.</b>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -98,7 +98,7 @@ const mot = document.createElement('canvas'), mctx = mot.getContext('2d', { will
 
 let ssdModel = null, poseDetector = null, hqMode = false, switching = false;
 let voiceOn = true, motionOn = false, facing = 'user';
-let running = false, count = 0, handFlags = 0, motionAssists = 0;
+let running = false, count = 0, motionAssists = 0;
 let wrists = [], body = null;          // body: {cx, hy, ay, h, w, knees, ankles, expR}
 let lastBall = null, lastBallSeen = 0, lostSaid = false;
 let prevMotion = null;
@@ -106,14 +106,16 @@ let frames = 0, fps = 0, lastFpsAt = performance.now(), frameIdx = 0;
 let audioCtx = null;
 const PERSONAL_BEST = 31, NEW_USER = false;
 
-// ── v0.4 판정 상태 ──
+// ── v0.5 판정 상태 ──
 let S = [];            // 공 샘플 {t, y}
-let attArr = [];       // 손목 부착 여부(0/1) 최근 12샘플
 let jstate = null;     // 'down' | 'up'
 let extMax = null, extMaxT = 0, extMin = null;
 let vmaxFall = 0, vinExt = null;
-let pend = null;       // {t0, y0, att} — 반전 후 상승 확인 대기
+let pend = null;       // {t0, y0, need} — 반전 후 상승 확인 대기
 let lastCountAt = 0;
+let plantedHist = [];  // 접지 발목 y 이력 → 지면 추정
+let groundedSince = 0; // 공이 지면 근처에 머문 시작 시각
+let lastTouchMark = null; // 카운트 지점 링 {x,y,t}
 
 const clamp = (v,a,b)=>Math.min(Math.max(v,a),b);
 function tone(f,d,g){ try{
@@ -199,13 +201,14 @@ $('btnHQ').onclick = async () => {
 };
 
 function resetJudge(){
-  S = []; attArr = []; jstate = null;
+  S = []; jstate = null;
   extMax = null; extMaxT = 0; extMin = null;
   vmaxFall = 0; vinExt = null; pend = null;
+  groundedSince = 0; lastTouchMark = null;
 }
 
 $('btnStart').onclick = () => {
-  count = 0; handFlags = 0; motionAssists = 0; lastCountAt = 0;
+  count = 0; motionAssists = 0; lastCountAt = 0;
   resetJudge();
   running = true;
   tone(660,.06);
@@ -228,19 +231,14 @@ function say(text, alert){
     msgTimer = setTimeout(()=>m.classList.remove('alert'), 1400);
   }
 }
-function addCount(){
+function addCount(px, py){
   count++;
+  lastTouchMark = { x: px, y: py, t: performance.now() };
   $('count').textContent = count;
   const w = $('countWrap');
   w.classList.remove('pop'); void w.offsetWidth; w.classList.add('pop');
   beep(); flash('g');
   speak(String(count));
-}
-function flagHand(){
-  handFlags++; buzz(); flash('r');
-  speak('손 사용');
-  say('🖐 손 사용 감지 — 카운트 제외 (' + handFlags + '회)', true);
-  if(handFlags >= 3){ endSession('손 사용 3회 — 도전 무효'); }
 }
 function endSession(reason){
   running = false;
@@ -248,17 +246,13 @@ function endSession(reason){
   $('btnStop').style.display = 'none';
   const minValid = NEW_USER ? 2 : 10;
   const isPB = count > PERSONAL_BEST;
-  const flagged = handFlags >= 3;
-  const valid = !flagged && (count >= minValid || isPB);
+  const valid = (count >= minValid || isPB);
   $('resFinal').textContent = count + '개';
   const tag = $('resTag');
-  if(flagged){ tag.textContent = '무효 — 손 사용 감지 ' + handFlags + '회 🖐'; tag.className = 'tag flag'; speak('손 사용으로 무효'); }
-  else if(isPB){ tag.textContent = '개인 최고 경신! 🎉'; tag.className = 'tag'; speak('종료. ' + count + '개. 개인 최고 경신!'); }
+  if(isPB){ tag.textContent = '개인 최고 경신! 🎉'; tag.className = 'tag'; speak('종료. ' + count + '개. 개인 최고 경신!'); }
   else if(valid){ tag.textContent = '유효 도전 ✓'; tag.className = 'tag'; speak('종료. ' + count + '개. 유효 도전'); }
   else{ tag.textContent = '무효 (기준 ' + minValid + '개)'; tag.className = 'tag invalid'; speak('종료. ' + count + '개'); }
-  $('resSub').textContent = '종료: ' + reason +
-    (handFlags ? ' · 손감지 ' + handFlags : '') +
-    (motionAssists ? ' · 모션보조 ' + motionAssists : '');
+  $('resSub').textContent = '종료: ' + reason + (motionAssists ? ' · 모션보조 ' + motionAssists : '');
   $('result').style.display = 'block';
   say('다시 도전하려면 시작을 누르세요');
 }
@@ -347,22 +341,32 @@ async function detectBall(now){
   return found;
 }
 
-// ── v0.4 판정 엔진: 반전 + 선명도 + 부착률 ──
+// ── v0.5 판정 엔진: 반전 + 지면 감지 + 선명도 + 체류시간 (실영상 2편 검증) ──
+function medianPlanted(){
+  if(!plantedHist.length) return null;
+  const ys = plantedHist.map(e=>e.y).sort((a,b)=>a-b);
+  return ys[(ys.length/2)|0];
+}
 function judge(now, ball){
   if(!running || !ball || !body) return;
   const bodyH = body.h, hipY = body.hy;
-  const floor = bodyH * 0.0009;           // px/ms — 최소 낙하/상승 속도
+  const floor = bodyH * 0.0009;           // px/ms 최소 속도 (검증값: 0.03·bodyH/frame@30fps)
   const hys = bodyH * 0.035;
-
-  const wd = wrists.length ? Math.min(...wrists.map(w => Math.hypot(ball.x - w.x, ball.y - w.y))) : 999;
-  attArr.push(wd < body.expR * 2.4 ? 1 : 0);
-  if(attArr.length > 12) attArr.shift();
-  const attm = attArr.length >= 6 ? attArr.reduce((a,b)=>a+b,0) / attArr.length : 0;
+  const plY = medianPlanted();
 
   S.push({ t: now, y: ball.y });
   if(S.length > 16) S.shift();
 
-  // 반전 후 상승 확인 대기
+  // 지면 정지 감지: 공이 접지선 근처에 1.2초+ 머무르면 종료
+  if(plY !== null){
+    const nearGround = ball.y > plY - 1.8 * body.expR;
+    if(nearGround){
+      if(!groundedSince) groundedSince = now;
+      else if(now - groundedSince > 1200 && count > 0){ endSession('바닥 터치'); return; }
+    } else groundedSince = 0;
+  }
+
+  // 반전 후 반등 확인 대기
   if(pend){
     if(now - pend.t0 <= 380){
       let vo = null;
@@ -372,10 +376,10 @@ function judge(now, ball){
           vo = vo === null ? v : Math.max(vo, v);
         }
       }
-      if(vo !== null && vo > floor * 0.7){
+      if(vo !== null && vo > pend.need){
         if(pend.t0 - lastCountAt > 280){
-          if(pend.att >= 0.9){ flagHand(); if(!running) return; }
-          else { addCount(); lastCountAt = pend.t0; }
+          addCount(pend.x, pend.y0);
+          lastCountAt = pend.t0;
         }
         pend = null;
       }
@@ -388,7 +392,6 @@ function judge(now, ball){
   }
   if(jstate === 'down'){
     if(ball.y >= extMax){
-      // 새 극대 → 진입 속도 갱신
       let vi = null;
       const prevs = S.slice(0, -1).slice(-3);
       for(const s of prevs){
@@ -399,13 +402,21 @@ function judge(now, ball){
       extMax = ball.y; extMaxT = now;
     } else if(extMax - ball.y > hys){
       const fall = extMax - extMin;
-      const gate = extMax > hipY - 0.12 * bodyH;
-      const sharp = vinExt !== null && vinExt > Math.max(floor, 0.4 * vmaxFall);
-      if(gate && fall > 0.07 * bodyH){
-        if(sharp){
-          pend = { t0: extMaxT, y0: extMax, att: attm };
-        } else if(attm >= 0.8){
-          flagHand(); if(!running) return;
+      const gndRel = plY !== null ? (extMax - plY) / body.expR : -99;
+      const turnaround = now - extMaxT;
+      if(gndRel >= -1.8 && fall > 0.07 * bodyH){
+        // 바닥 튀김: 카운트 금지 + 도전 종료(시작 전이면 경고만)
+        if(count > 0){ endSession('바닥 터치'); return; }
+        else { say('공이 바닥에 닿았어요 — 다시 차 올리세요!', true); buzz(); }
+      } else {
+        const gate = extMax > hipY - 0.22 * bodyH;
+        const strong = vinExt !== null && vinExt > Math.max(floor, 0.4 * vmaxFall);
+        const sharp = strong
+          || (vmaxFall > floor * 1.3 && fall > 0.07 * bodyH)
+          || (vinExt === null && fall > 0.08 * bodyH);
+        if(gate && fall > 0.07 * bodyH && sharp && turnaround <= 330){
+          const need = floor * ((strong || vinExt === null) ? 0.7 : 1.15);
+          pend = { t0: extMaxT, y0: extMax, need, x: ball.x };
         }
       }
       jstate = 'up'; extMin = ball.y; vmaxFall = 0; vinExt = null;
@@ -433,17 +444,26 @@ async function loop(){
         const pick = n => { const k = kp.find(p=>p.name===n); return (k && k.score > 0.3) ? k : null; };
         wrists = [pick('left_wrist'), pick('right_wrist')].filter(Boolean);
         const nose = pick('nose');
+        const shs = [pick('left_shoulder'), pick('right_shoulder')].filter(Boolean);
         const hips = [pick('left_hip'), pick('right_hip')].filter(Boolean);
         const ankles = [pick('left_ankle'), pick('right_ankle')].filter(Boolean);
         const knees = [pick('left_knee'), pick('right_knee')].filter(Boolean);
-        if(nose && hips.length && ankles.length){
+        if(hips.length && ankles.length){
           const hy = hips.reduce((s,k)=>s+k.y,0)/hips.length;
           const ay = ankles.reduce((s,k)=>s+k.y,0)/ankles.length;
           const cx = hips.reduce((s,k)=>s+k.x,0)/hips.length;
-          const h = ay - nose.y;
+          const planted = Math.max(...ankles.map(k=>k.y));
+          // 신체 기준 높이: 코 → 어깨 → 골반 순 폴백 (등 돌아도 유지)
+          let h = null;
+          if(nose) h = ay - nose.y;
+          else if(shs.length) h = (ay - shs.reduce((s,k)=>s+k.y,0)/shs.length) * 1.17;
+          else h = (planted - hy) * 1.7;
           const xs = [...hips, ...ankles, ...knees].map(k=>k.x);
           const w = Math.max(60, Math.max(...xs) - Math.min(...xs));
           body = { cx, hy, ay, h, w, knees, ankles, expR: clamp(h * 0.065, 7, 90) };
+          const now2 = performance.now();
+          plantedHist.push({ t: now2, y: planted });
+          plantedHist = plantedHist.filter(e => now2 - e.t < 700);
         }
       }
     }catch(e){}
@@ -474,27 +494,35 @@ async function loop(){
 
   ctx.clearRect(0,0,overlay.width,overlay.height);
   if(body){
-    const gateY = body.hy - 0.12 * body.h;   // 터치 인정선(이 아래에서 반전해야 카운트)
+    const gateY = body.hy - 0.22 * body.h;   // 터치 인정 상한선
     ctx.setLineDash([10,8]); ctx.strokeStyle = '#F2691D'; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.moveTo(0,gateY); ctx.lineTo(overlay.width,gateY); ctx.stroke();
+    const plY = medianPlanted();
+    if(plY !== null){
+      const gY = plY - 1.8 * body.expR;      // 지면 판정선(이 아래 반전 = 바닥 튀김)
+      ctx.setLineDash([4,6]); ctx.strokeStyle = '#FF5A47'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(0,gY); ctx.lineTo(overlay.width,gY); ctx.stroke();
+    }
     ctx.setLineDash([]);
+  }
+  if(lastTouchMark && now - lastTouchMark.t < 450){
+    ctx.strokeStyle = '#3DDC84'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(lastTouchMark.x, lastTouchMark.y, 34, 0, Math.PI*2); ctx.stroke();
   }
   if(ball){
     ctx.strokeStyle = (jstate === 'up') ? '#B9F04A' : '#FFFFFF'; ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.r + 5, 0, Math.PI*2); ctx.stroke();
   }
-  const attPct = attArr.length ? Math.round(attArr.reduce((a,b)=>a+b,0)/attArr.length*100) : 0;
   $('stat').innerHTML = 'FPS ' + fps + (hqMode?' 🎯':'') +
     '<br>볼 ' + (ball ? (ball.score*100|0) + '% ' + ball.src : '<span class="warn">—</span>') +
-    '<br>부착 ' + attPct + '% · ' + (jstate||'—') +
-    (handFlags ? '<br><span class="warn">손감지 ' + handFlags + '</span>' : '');
+    '<br>' + (jstate||'—');
 
   if(!running){
-    if(!body){ say('전신(머리~발)이 보이게 서 주세요'); }
+    if(!body){ say('골반과 발이 보이게 서 주세요'); }
     else if(!ball && now - lastBallSeen > 800){ say('공을 발 앞에 두세요 (상단 스트립: 빨강=놓침)'); }
     else { say('준비 완료! 시작을 누르세요'); }
   } else if(!body){
-    say('전신이 보여야 카운트돼요 — 조금 뒤로!', true);
+    say('골반·발이 보여야 카운트돼요 — 조금 뒤로!', true);
   }
 }
 
