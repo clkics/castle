@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.6</title>
+<title>풋볼캐슬 — 리프팅 카운터 기술검증 v0.7</title>
 <style>
   :root{ --ink:#0F2E1D; --grass:#1E7A46; --ball:#F2691D; --crown:#D9A02B; --ok:#3DDC84; --bad:#FF5A47; }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -48,8 +48,9 @@
 </style>
 </head>
 <body>
-<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.6</h1>
-<p class="note">v0.6: <b>✋ 양손을 머리 위로 올리면 3·2·1 자동 시작</b>(폰까지 갈 필요 없음) · <b>가로 화면 지원</b>(폰을 눕히면 자동 전환 — 옆으로 움직여도 앵글 유지) · 바닥 종료 안정화(카운트 0에서도 작동).<br>
+<h1>풋볼캐슬 <span>리프팅 카운터</span> v0.7</h1>
+<p class="note">v0.7: <b>공을 잡으면 자동 종료(캐치 감지)</b> · 가로/원거리 보강(1080p 캡처 + 인물 작으면 자동 고정밀 + 놓침 시 전체화면 부스트 탐색) · 터치 없이 10초면 자동 종료.<br>
+✋ 양손 머리 위 = 3·2·1 자동 시작 · 가로 화면 지원.<br>
 <b>⚠ 다운로드 후 크롬에서 직접 열기.</b> 멀리서는 소리로 확인하세요.</p>
 
 <div class="stage">
@@ -84,7 +85,8 @@
   <b>v0.5 판정 엔진 (실영상 2편 검증)</b> — 터치 = 궤적의 하강→상승 반전 + ① 접지 발목보다 충분히 위(<b>바닥 튀김이면 카운트 대신 도전 종료</b>) ② 상체 중간선 아래 ③ 낙하 신장의 7%↑ ④ 가속 낙하 + 급반전(발로 찬 공의 물리) ⑤ 반전 체류 0.33초 이내(잡았다 던지면 배제) ⑥ 반등 속도 확인.<br>
   <b>v0.4 대비</b> — 손목 부착률 판정 폐기(정상 리프팅 손사용 오탐 제거) · 바닥 튀김/공 정지 감지로 도전 자동 종료 · 컨택 속도 소실 시 구제 경로 추가(카운팅률↑) · 얼굴이 안 보여도(등 돌아도) 어깨/골반으로 신체 기준 유지.<br>
   <b>화면 확인</b> — 카운트 순간 터치 지점에 초록 링 표시 + 화면 플래시 + 음성. 상단 스트립: <b style="color:#3DDC84">초록=추적</b> · <b style="color:#D9A02B">노랑=확대추적</b> · <b style="color:#FF5A47">빨강=놓침</b>. <b>골반과 발목이 보여야 카운트됩니다.</b><br>
-  <b>자동 시작</b> — ✋ 양손을 머리 위로 0.6초 올리면 "셋·둘·하나" 후 자동 시작(종료 후 재도전도 동일). <b>가로 촬영</b> — 폰을 눕히면 화면이 자동 전환됩니다. 좌우 이동이 많은 초보는 가로 권장(이동 여유 ~3배). 단 같은 전신 구도 기준 인물이 작아져 공 인식은 다소 불리 — 가능하면 고정밀 모드를 켜세요.
+  <b>자동 시작/종료</b> — ✋ 양손 머리 위 0.6초 = 3·2·1 자동 시작. 종료: 바닥 터치 · <b>공을 잡고 1.4초</b> · 터치 없이 10초 · 공 미검출 3.5초.<br>
+  <b>가로/원거리</b> — 1080p 캡처를 요청하고, 인물이 작아지면 자동으로 고정밀 모드 전환, 공을 놓치면 전체 화면 부스트 탐색이 돕니다. 그래도 가로는 인물이 작아져 인식이 불리할 수 있습니다(근본 해법은 전용 모델 = S1).
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
@@ -101,7 +103,8 @@ let ssdModel = null, poseDetector = null, hqMode = false, switching = false;
 let voiceOn = true, motionOn = false, facing = 'user';
 let running = false, count = 0, motionAssists = 0;
 let wrists = [], body = null, noseY = null;
-let handsUpSince = 0, countdownStep = -1, countdownAt = 0, gestureCoolUntil = 0;          // body: {cx, hy, ay, h, w, knees, ankles, expR}
+let handsUpSince = 0, countdownStep = -1, countdownAt = 0, gestureCoolUntil = 0;
+let autoHqDone = false, holdHist = [];          // body: {cx, hy, ay, h, w, knees, ankles, expR}
 let lastBall = null, lastBallSeen = 0, lostSaid = false;
 let prevMotion = null;
 let frames = 0, fps = 0, lastFpsAt = performance.now(), frameIdx = 0;
@@ -170,7 +173,7 @@ async function loadModels(){
 async function startCamera(){
   if(video.srcObject){ video.srcObject.getTracks().forEach(t=>t.stop()); }
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: facing, width: {ideal: 1280}, height: {ideal: 720} }, audio: false
+    video: { facingMode: facing, width: {ideal: 1920}, height: {ideal: 1080} }, audio: false
   });
   video.srcObject = stream;
   await new Promise(res => { video.onloadedmetadata = res; });
@@ -208,7 +211,7 @@ $('btnHQ').onclick = async () => {
 };
 
 function resetJudge(){
-  S = []; jstate = null;
+  S = []; jstate = null; holdHist = [];
   extMax = null; extMaxT = 0; extMin = null;
   vmaxFall = 0; vinExt = null; pend = null;
   groundedSince = 0; lastTouchMark = null;
@@ -320,6 +323,15 @@ function motionBlob(now){
 async function detectBall(now){
   const vw = video.videoWidth, vh = video.videoHeight;
   let found = null, src = 'full';
+  // 놓침 부스트: 도전 중 0.6초+ 놓치면 전체 프레임 저임계 우선 탐색
+  if(running && now - lastBallSeen > 600){
+    let dets = [];
+    try{ dets = await ssdModel.detect(video, 5, 0.18); }catch(e){}
+    const c = dets.filter(d => d.class === 'sports ball')
+      .map(d => { const [x,y,w,h]=d.bbox; return {x:x+w/2, y:y+h/2, r:Math.max(w,h)/2, score:d.score}; })
+      .filter(d => sizeOK(d.r));
+    if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; found.src = 'full'; return found; }
+  }
   if(lastBall && now - lastBallSeen < 1200 && frameIdx % 14 !== 0){
     const side = clamp(lastBall.r * 9, 240, Math.min(vw, vh));
     const rx = clamp(lastBall.x - side/2, 0, vw - side);
@@ -332,7 +344,7 @@ async function detectBall(now){
     const cy = (body.hy + body.ay) / 2 + body.h * 0.08;
     const rx = clamp(body.cx - side/2, 0, vw - side);
     const ry = clamp(cy - side/2, 0, vh - side);
-    const c = (await detectInRegion(rx, ry, side, 0.15)).filter(d => sizeOK(d.r));
+    const c = (await detectInRegion(rx, ry, side, 0.13)).filter(d => sizeOK(d.r));
     if(c.length){ c.sort((a,b)=>b.score-a.score); found = c[0]; src = 'leg'; }
   }
   if(!found){
@@ -374,6 +386,23 @@ function judge(now, ball){
       if(!groundedSince) groundedSince = now;
       else if(now - groundedSince > (count > 0 ? 1200 : 2500)){ endSession('바닥 터치'); return; }
     } else groundedSince = 0;
+  }
+
+  // 캐치 감지: 공이 골반 기준 같은 높이에 1.4초+ 정지 + 손목 근접 → 종료
+  {
+    const wd = wrists.length ? Math.min(...wrists.map(w => Math.hypot(ball.x - w.x, ball.y - w.y))) : 999;
+    holdHist.push({ t: now, rel: ball.y - hipY, wd });
+    holdHist = holdHist.filter(e => now - e.t < 1600);
+    if(count > 0 && holdHist.length >= 8 && now - holdHist[0].t > 1400){
+      const rels = holdHist.map(e => e.rel);
+      const span = Math.max(...rels) - Math.min(...rels);
+      const wds = holdHist.map(e => e.wd).sort((a,b)=>a-b);
+      const wdMed = wds[(wds.length/2)|0];
+      const offGround = plY === null || ball.y < plY - 2.0 * body.expR;
+      if(span < 0.10 * bodyH && wdMed < body.expR * 2.0 && offGround){
+        endSession('캐치 (공을 잡음)'); return;
+      }
+    }
   }
 
   // 반전 후 반등 확인 대기
@@ -475,6 +504,9 @@ async function loop(){
           const now2 = performance.now();
           plantedHist.push({ t: now2, y: planted });
           plantedHist = plantedHist.filter(e => now2 - e.t < 700);
+          if(body.expR < 18 && !hqMode && !switching && !autoHqDone){
+            autoHqDone = true; $('btnHQ').onclick();   // 원거리 자동 고정밀
+          }
         }
       }
     }catch(e){}
@@ -493,6 +525,9 @@ async function loop(){
   }
   if(running && count > 0 && now - lastBallSeen > 3500){
     endSession('공 미검출 (드롭)');
+  }
+  if(running && count > 0 && now - lastCountAt > 10000){
+    endSession('시간 초과 (터치 없음 10초)');
   }
 
   // ── 추적 스트립 + 오버레이 ──
